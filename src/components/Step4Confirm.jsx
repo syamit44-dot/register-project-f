@@ -291,12 +291,6 @@ export default function Step4Confirm({ data, onChange, onGoTo }) {
                     )}
                   </p>
                 </div>
-                <div className="py-1.5">
-                  <p className="text-[12px] tracking-[0.03em] text-ink-soft">{t("poNumber")}</p>
-                  <p className="mt-0.5 text-[13.5px] text-ink">
-                    {data.po_number || <span className="text-[13.5px] text-alert">{t("notProvided")}</span>}
-                  </p>
-                </div>
               </div>
             </div>
           </SummarySection>

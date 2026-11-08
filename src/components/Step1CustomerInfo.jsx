@@ -329,9 +329,6 @@ export default function Step1CustomerInfo({ data, onChange }) {
               </div>
             </div>
           </div>
-          <Field label={t("poNumber")} className="md:col-span-2">
-            <input className={inputClass} value={data.po_number ?? ""} onChange={set("po_number")} />
-          </Field>
         </div>
       </div>
 
