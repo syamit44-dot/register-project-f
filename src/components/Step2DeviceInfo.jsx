@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import Icon from "./Icon";
 import SearchableSelect from "./SearchableSelect";
@@ -237,9 +237,6 @@ export default function Step2DeviceInfo({ active, data, onChange }) {
   const [selectedAlarms, setSelectedAlarms] = useState(data.alarms || []);
   const [selectedSilonic, setSelectedSilonic] = useState([]);
   const [showHouseListInfo, setShowHouseListInfo] = useState(false);
-  const copyDialogRef = useRef(null);
-  const copyCancelRef = useRef(null);
-  const [copySourceIndex, setCopySourceIndex] = useState(null);
   const [copyTargets, setCopyTargets] = useState([]);
   const [equipmentModels, setEquipmentModels] = useState([]);
   const [catalogState, setCatalogState] = useState("loading");
@@ -259,14 +256,14 @@ export default function Step2DeviceInfo({ active, data, onChange }) {
   }, [active]);
 
   const houses = useMemo(() => (data.houses ?? []).map(normalizeHouse), [data.houses]);
-  const copySources = houses.flatMap((house, index) => (
-    (house.model_enabled && house.device_models.length)
-      || (house.alarm_enabled && house.alarms.length)
-      || (house.egg_enabled && house.egg_models.length)
-      || (house.silonic_enabled && house.silonic_models.length)
-      ? [index]
-      : []
-  ));
+  const isBulkEditing = editingIndex === null && draft !== null;
+  const enabledEquipment = draft ? [
+    draft.model_enabled ? draft.device_models : null,
+    draft.alarm_enabled ? draft.alarms : null,
+    draft.silonic_enabled ? draft.silonic_models : null,
+    draft.egg_enabled ? draft.egg_models : null,
+  ].filter(Boolean) : [];
+  const canCopy = copyTargets.length > 0 && enabledEquipment.length > 0 && enabledEquipment.every((models) => models.length > 0);
   const expectedHouseCount = Math.max(1, Number.parseInt(data.house_count, 10) || 1);
 
   useEffect(() => {
@@ -285,13 +282,14 @@ export default function Step2DeviceInfo({ active, data, onChange }) {
   }, [data, expectedHouseCount, onChange]);
 
   function openEditor(index) {
-    const normalized = normalizeHouse(houses[index]);
+    const normalized = index === null ? emptyHouseDetail() : houses[index];
     setDraft(normalized);
     setSelectedModel(normalized.device_models?.[0]?.model || "");
     setSelectedAlarms(normalized.alarms || []);
     setSelectedEggModels(normalized.egg_models || []);
     setEditingIndex(index);
     setSelectedSilonic(normalized.silonic_models || []);
+    setCopyTargets([]);
   }
 
   function closeEditor() {
@@ -300,28 +298,13 @@ export default function Step2DeviceInfo({ active, data, onChange }) {
   }
 
   function saveEditor() {
-    if (editingIndex === null || !draft) return;
-    const nextHouses = houses.map((h, i) => (i === editingIndex ? { ...draft, configured: true } : h));
+    if (!draft || (isBulkEditing && !canCopy)) return;
+    const nextHouses = data.houses.map((house, index) => {
+      if (isBulkEditing && copyTargets.includes(index)) return copyHouseSettings(draft, houses[index]);
+      return index === editingIndex ? { ...draft, configured: true } : house;
+    });
     onChange({ ...data, houses: nextHouses });
     closeEditor();
-  }
-
-  function openCopyDialog() {
-    setCopySourceIndex(copySources[0] ?? null);
-    setCopyTargets([]);
-    copyDialogRef.current.showModal();
-    copyCancelRef.current.focus();
-  }
-
-  function applyHouseSettings() {
-    if (!copySources.includes(copySourceIndex) || copyTargets.length === 0) return;
-    const source = houses[copySourceIndex];
-    const targets = new Set(copyTargets);
-    const nextHouses = data.houses.map((house, index) => (
-      index !== copySourceIndex && targets.has(index) ? copyHouseSettings(source, houses[index]) : house
-    ));
-    onChange({ ...data, houses: nextHouses });
-    copyDialogRef.current.close();
   }
 
   function updateDraft(patch) {
@@ -578,7 +561,7 @@ export default function Step2DeviceInfo({ active, data, onChange }) {
           {houses.length > 1 && (
             <button
               type="button"
-              onClick={openCopyDialog}
+              onClick={() => openEditor(null)}
               className="ml-auto inline-flex items-center gap-1.5 rounded-lg border border-brand bg-white px-3 py-2 text-[12px] font-semibold text-brand-dark transition hover:bg-brand-tint"
             >
               <Icon name="copy" style={{ fontSize: 14 }} />
@@ -679,74 +662,43 @@ export default function Step2DeviceInfo({ active, data, onChange }) {
         </div>
       </div>
 
-      <dialog
-        ref={copyDialogRef}
-        aria-labelledby="copy-house-settings-title"
-        className="m-auto max-h-[85vh] w-[calc(100%-2rem)] max-w-lg rounded-xl border border-line bg-white p-5 text-ink shadow-xl backdrop:bg-ink/45 sm:p-6"
-      >
-        <h2 id="copy-house-settings-title" className="mb-4 text-lg font-bold">{t("copyHouseSettings")}</h2>
-        {copySources.length === 0 ? (
-          <p className="text-sm text-ink-soft">{t("copyHouseNoSource")}</p>
-        ) : (
-          <div className="space-y-4">
-            <SearchableSelect
-              label={t("copyHouseSource")}
-              value={copySourceIndex}
-              options={copySources.map((index) => ({ value: index, label: houses[index].name }))}
-              onChange={({ value: index }) => {
-                setCopySourceIndex(index);
-                setCopyTargets((targets) => targets.filter((target) => target !== index));
-              }}
-            />
-            <fieldset>
-              <legend className="mb-2 text-sm font-semibold">{t("copyHouseTargets")}</legend>
-              <div className="max-h-52 space-y-1 overflow-y-auto rounded-lg border border-line p-1">
-                {houses.map((house, index) => index !== copySourceIndex && (
-                  <label key={index} className="flex cursor-pointer items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-mist">
-                    <input
-                      type="checkbox"
-                      className="h-4 w-4 accent-brand"
-                      checked={copyTargets.includes(index)}
-                      onChange={(event) => {
-                        const checked = event.target.checked;
-                        setCopyTargets((targets) => checked ? [...targets, index] : targets.filter((target) => target !== index));
-                      }}
-                    />
-                    {house.name}
-                  </label>
-                ))}
-              </div>
-            </fieldset>
-            <p className="rounded-lg bg-mist px-3 py-2.5 text-[13px] text-ink-soft">{t("copyHouseNotice")}</p>
-          </div>
-        )}
-        <div className="mt-5 flex flex-wrap justify-end gap-2">
-          <button ref={copyCancelRef} type="button" onClick={() => copyDialogRef.current.close()} className="rounded-lg border border-line-strong px-4 py-2 text-sm font-medium hover:bg-mist">
-            {t("cancel")}
-          </button>
-          <button
-            type="button"
-            disabled={!copySources.includes(copySourceIndex) || copyTargets.length === 0}
-            onClick={applyHouseSettings}
-            className="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {t("copyHouseApply")}
-          </button>
-        </div>
-      </dialog>
-
-      {editingIndex !== null && draft &&
+      {draft &&
         createPortal(
           <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-ink/45 px-4 py-6">
-            <div className="flex max-h-[92vh] w-full max-w-5xl flex-col rounded-xl bg-white shadow-2xl">
+            <div role="dialog" aria-modal="true" aria-labelledby="house-settings-title" className="flex max-h-[92vh] w-full max-w-5xl flex-col rounded-xl bg-white shadow-2xl">
               <div className="flex flex-shrink-0 items-center justify-between rounded-t-xl border-b border-line-strong bg-brand px-7 py-5">
-                <span className="text-xl font-bold text-white sm:text-2xl">{houses[editingIndex]?.name}</span>
-                <button type="button" onClick={closeEditor} className="flex h-8 w-8 items-center justify-center rounded-full text-white/90 transition hover:bg-white/15 hover:text-white">
+                <h2 id="house-settings-title" className="text-xl font-bold text-white sm:text-2xl">
+                  {isBulkEditing ? t("copyHouseSettings") : houses[editingIndex]?.name}
+                </h2>
+                <button type="button" onClick={closeEditor} aria-label={t("close")} className="flex h-8 w-8 items-center justify-center rounded-full text-white/90 transition hover:bg-white/15 hover:text-white">
                   <Icon name="x" style={{ fontSize: 20 }} />
                 </button>
               </div>
 
               <div className="space-y-6 overflow-y-auto px-7 py-7">
+                {isBulkEditing && (
+                  <fieldset className="rounded-xl border border-line bg-white px-5 pb-4 pt-2">
+                    <legend className="px-1 text-sm font-semibold text-ink">{t("copyHouseTargets")}</legend>
+                    <div className="grid max-h-40 gap-2 overflow-y-auto sm:grid-cols-2 lg:grid-cols-4">
+                      {houses.map((house, index) => (
+                        <label key={index} className="flex cursor-pointer items-center gap-2 rounded-lg border border-line px-3 py-2 text-sm hover:bg-mist">
+                          <input
+                            type="checkbox"
+                            className="h-4 w-4 accent-brand"
+                            checked={copyTargets.includes(index)}
+                            onChange={(event) => {
+                              const checked = event.target.checked;
+                              setCopyTargets((targets) => checked ? [...targets, index] : targets.filter((target) => target !== index));
+                            }}
+                          />
+                          {house.name}
+                        </label>
+                      ))}
+                    </div>
+                    <p className="mt-3 text-[13px] text-ink-soft">{t("copyHouseNotice")}</p>
+                  </fieldset>
+                )}
+
                 {/* Device Model */}
                 <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-[0_2px_8px_rgba(22,35,61,0.035)]">
                   <label className="flex items-center gap-2 text-sm font-medium text-ink">
@@ -765,21 +717,23 @@ export default function Step2DeviceInfo({ active, data, onChange }) {
                           <div className="flex-1">
                             {renderModelSelect("CONTROLLER", selectedModel, draft.device_models[0]?.model_name ?? modelData[selectedModel]?.name ?? selectedModel, handleDeviceModelSelect)}
                           </div>
-                          <div className="flex-1">
-                            <label className="block text-[13px] font-semibold text-ink">
-                              S / N<span className="ml-0.5 text-alert">*</span>
-                              <input
-                                type="text"
-                                className="mt-1.5 h-11 w-full rounded-xl border border-line-strong bg-white px-3.5 text-[13.5px] text-ink shadow-sm outline-none transition hover:border-brand/50 focus:border-brand focus:ring-4 focus:ring-brand-tint disabled:bg-mist disabled:text-ink-soft disabled:shadow-none"
-                                placeholder={t("enterSerialNumber")}
-                                disabled={!selectedModel}
-                                value={draft.device_models?.[0]?.serial_number ?? ""}
-                                onChange={(e) => handleDeviceSerialChange(e.target.value)}
-                              />
-                            </label>
-                          </div>
+                          {!isBulkEditing && (
+                            <div className="flex-1">
+                              <label className="block text-[13px] font-semibold text-ink">
+                                S / N<span className="ml-0.5 text-alert">*</span>
+                                <input
+                                  type="text"
+                                  className="mt-1.5 h-11 w-full rounded-xl border border-line-strong bg-white px-3.5 text-[13.5px] text-ink shadow-sm outline-none transition hover:border-brand/50 focus:border-brand focus:ring-4 focus:ring-brand-tint disabled:bg-mist disabled:text-ink-soft disabled:shadow-none"
+                                  placeholder={t("enterSerialNumber")}
+                                  disabled={!selectedModel}
+                                  value={draft.device_models?.[0]?.serial_number ?? ""}
+                                  onChange={(e) => handleDeviceSerialChange(e.target.value)}
+                                />
+                              </label>
+                            </div>
+                          )}
                         </div>
-                        {renderCommunicationPicker("device_communication", { showSmartlinkSerial: true })}
+                        {renderCommunicationPicker("device_communication", { showSmartlinkSerial: !isBulkEditing })}
                       </div>
                       <ModelImagePreview
                         svgHtml={findArtwork(modelData, draft.device_models[0])?.svg}
@@ -807,19 +761,21 @@ export default function Step2DeviceInfo({ active, data, onChange }) {
                           <div className="flex-1">
                             {renderModelSelect("ALARM", selectedAlarms[0]?.key || "", selectedAlarms[0]?.model_name ?? summarizeAlarms(selectedAlarms), handleAlarmSelect)}
                           </div>
-                          <div className="flex-1">
-                            <label className="block text-[13px] font-semibold text-ink">
-                              S / N<span className="ml-0.5 text-alert">*</span>
-                              <input
-                                type="text"
-                                className="mt-1.5 h-11 w-full rounded-xl border border-line-strong bg-white px-3.5 text-[13.5px] text-ink shadow-sm outline-none transition hover:border-brand/50 focus:border-brand focus:ring-4 focus:ring-brand-tint disabled:bg-mist disabled:text-ink-soft disabled:shadow-none"
-                                placeholder={t("enterSerialNumber")}
-                                disabled={!selectedAlarms[0]?.key}
-                                value={draft.alarms?.[0]?.serial_number ?? ""}
-                                onChange={(e) => handleAlarmSerialChange(e.target.value)}
-                              />
-                            </label>
-                          </div>
+                          {!isBulkEditing && (
+                            <div className="flex-1">
+                              <label className="block text-[13px] font-semibold text-ink">
+                                S / N<span className="ml-0.5 text-alert">*</span>
+                                <input
+                                  type="text"
+                                  className="mt-1.5 h-11 w-full rounded-xl border border-line-strong bg-white px-3.5 text-[13.5px] text-ink shadow-sm outline-none transition hover:border-brand/50 focus:border-brand focus:ring-4 focus:ring-brand-tint disabled:bg-mist disabled:text-ink-soft disabled:shadow-none"
+                                  placeholder={t("enterSerialNumber")}
+                                  disabled={!selectedAlarms[0]?.key}
+                                  value={draft.alarms?.[0]?.serial_number ?? ""}
+                                  onChange={(e) => handleAlarmSerialChange(e.target.value)}
+                                />
+                              </label>
+                            </div>
+                          )}
                         </div>
                         {renderCommunicationPicker("alarm_communication")}
                       </div>
@@ -849,19 +805,21 @@ export default function Step2DeviceInfo({ active, data, onChange }) {
                           <div className="flex-1">
                             {renderModelSelect("SILONIC", selectedSilonic[0]?.model || "", selectedSilonic[0]?.model_name ?? selectedSilonic[0]?.model, handleSilonicSelect)}
                           </div>
-                          <div className="flex-1">
-                            <label className="block text-[13px] font-semibold text-ink">
-                              S / N<span className="ml-0.5 text-alert">*</span>
-                              <input
-                                type="text"
-                                className="mt-1.5 h-11 w-full rounded-xl border border-line-strong bg-white px-3.5 text-[13.5px] text-ink shadow-sm outline-none transition hover:border-brand/50 focus:border-brand focus:ring-4 focus:ring-brand-tint disabled:bg-mist disabled:text-ink-soft disabled:shadow-none"
-                                placeholder={t("enterSerialNumber")}
-                                disabled={!selectedSilonic[0]?.model}
-                                value={draft.silonic_models?.[0]?.serial_number ?? ""}
-                                onChange={(e) => handleSilonicSerialChange(e.target.value)}
-                              />
-                            </label>
-                          </div>
+                          {!isBulkEditing && (
+                            <div className="flex-1">
+                              <label className="block text-[13px] font-semibold text-ink">
+                                S / N<span className="ml-0.5 text-alert">*</span>
+                                <input
+                                  type="text"
+                                  className="mt-1.5 h-11 w-full rounded-xl border border-line-strong bg-white px-3.5 text-[13.5px] text-ink shadow-sm outline-none transition hover:border-brand/50 focus:border-brand focus:ring-4 focus:ring-brand-tint disabled:bg-mist disabled:text-ink-soft disabled:shadow-none"
+                                  placeholder={t("enterSerialNumber")}
+                                  disabled={!selectedSilonic[0]?.model}
+                                  value={draft.silonic_models?.[0]?.serial_number ?? ""}
+                                  onChange={(e) => handleSilonicSerialChange(e.target.value)}
+                                />
+                              </label>
+                            </div>
+                          )}
                         </div>
                         {renderCommunicationPicker("silonic_communication")}
                       </div>
@@ -891,19 +849,21 @@ export default function Step2DeviceInfo({ active, data, onChange }) {
                           <div className="flex-1">
                             {renderModelSelect("EGG", selectedEggModels[0]?.model || "", selectedEggModels[0]?.model_name ?? selectedEggModels[0]?.model, handleEggModelSelect)}
                           </div>
-                          <div className="flex-1">
-                            <label className="block text-[13px] font-semibold text-ink">
-                              S / N<span className="ml-0.5 text-alert">*</span>
-                              <input
-                                type="text"
-                                className="mt-1.5 h-11 w-full rounded-xl border border-line-strong bg-white px-3.5 text-[13.5px] text-ink shadow-sm outline-none transition hover:border-brand/50 focus:border-brand focus:ring-4 focus:ring-brand-tint disabled:bg-mist disabled:text-ink-soft disabled:shadow-none"
-                                placeholder={t("enterSerialNumber")}
-                                disabled={!selectedEggModels[0]?.model}
-                                value={draft.egg_models?.[0]?.serial_number ?? ""}
-                                onChange={(e) => handleEggSerialChange(e.target.value)}
-                              />
-                            </label>
-                          </div>
+                          {!isBulkEditing && (
+                            <div className="flex-1">
+                              <label className="block text-[13px] font-semibold text-ink">
+                                S / N<span className="ml-0.5 text-alert">*</span>
+                                <input
+                                  type="text"
+                                  className="mt-1.5 h-11 w-full rounded-xl border border-line-strong bg-white px-3.5 text-[13.5px] text-ink shadow-sm outline-none transition hover:border-brand/50 focus:border-brand focus:ring-4 focus:ring-brand-tint disabled:bg-mist disabled:text-ink-soft disabled:shadow-none"
+                                  placeholder={t("enterSerialNumber")}
+                                  disabled={!selectedEggModels[0]?.model}
+                                  value={draft.egg_models?.[0]?.serial_number ?? ""}
+                                  onChange={(e) => handleEggSerialChange(e.target.value)}
+                                />
+                              </label>
+                            </div>
+                          )}
                         </div>
                         {renderCommunicationPicker("egg_communication")}
                       </div>
@@ -927,9 +887,10 @@ export default function Step2DeviceInfo({ active, data, onChange }) {
                 <button
                   type="button"
                   onClick={saveEditor}
-                  className="h-10 rounded-xl border border-brand bg-brand px-5 text-[13px] font-semibold text-white shadow-sm transition hover:bg-brand-dark"
+                  disabled={isBulkEditing && !canCopy}
+                  className="h-10 rounded-xl border border-brand bg-brand px-5 text-[13px] font-semibold text-white shadow-sm transition hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {t("save")}
+                  {t(isBulkEditing ? "copyHouseApply" : "save")}
                 </button>
               </div>
             </div>
