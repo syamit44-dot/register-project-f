@@ -46,14 +46,29 @@ export function AppShellStyles() {
         transition: transform 240ms cubic-bezier(0.22,1,0.36,1), box-shadow 240ms ease, border-color 240ms ease;
       }
       .sidebar-collapse-transition {
+        --sidebar-background: #042C53;
+        background-color: var(--sidebar-background);
         transition: width 280ms cubic-bezier(0.16, 1, 0.3, 1);
       }
       .toggle-collapse-btn {
-        transition: box-shadow 180ms ease, background-color 180ms ease;
+        background-color: var(--sidebar-background);
       }
-      .toggle-collapse-btn:hover {
-        background-color: #0C4A82;
-        box-shadow: 0 6px 18px rgba(0,0,0,0.35);
+      .toggle-collapse-btn::before,
+      .toggle-collapse-btn::after {
+        content: "";
+        position: absolute;
+        left: 0;
+        width: 12px;
+        height: 12px;
+        pointer-events: none;
+      }
+      .toggle-collapse-btn::before {
+        bottom: 100%;
+        background: radial-gradient(circle at top right, transparent 11.5px, var(--sidebar-background) 12px);
+      }
+      .toggle-collapse-btn::after {
+        top: 100%;
+        background: radial-gradient(circle at bottom right, transparent 11.5px, var(--sidebar-background) 12px);
       }
     `}</style>
   );
@@ -175,7 +190,7 @@ export function SidebarNav({ active = "home", mobileOpen, onClose, onSignOutClic
     <>
       {/* Desktop persistent sidebar */}
       <aside
-        className={`sidebar-collapse-transition relative hidden shrink-0 overflow-visible bg-[#042C53] md:flex md:flex-col ${
+        className={`sidebar-collapse-transition relative hidden shrink-0 overflow-visible md:flex md:flex-col ${
           collapsed ? "w-20" : width
         }`}
       >
@@ -185,13 +200,13 @@ export function SidebarNav({ active = "home", mobileOpen, onClose, onSignOutClic
         </div>
         <SidebarContent active={active} onSignOutClick={onSignOutClick} extra={extra} collapsed={collapsed} extraNavItem={extraNavItem} />
 
-        {/* ปุ่มพับ/ขยาย — แคปซูลสีฟ้าเด่นชัด ยื่นออกมาจากขอบขวา ไม่มีเอฟเฟกต์บีบ/ย่อตอน hover ลูกศรคมชัดอ่านง่าย */}
         <button
           type="button"
           onClick={() => setCollapsed((c) => !c)}
+          aria-expanded={!collapsed}
           aria-label={collapsed ? "Expand menu" : "Collapse menu"}
           title={collapsed ? "Expand menu" : "Collapse menu"}
-          className="toggle-collapse-btn absolute -right-3 top-1/2 z-20 flex h-24 w-6 -translate-y-1/2 items-center justify-center rounded-full bg-[#185FA5] text-white shadow-[0_4px_14px_rgba(0,0,0,0.28)]"
+          className="toggle-collapse-btn absolute left-full top-1/2 z-20 -ml-px flex h-20 w-7 -translate-y-1/2 items-center justify-center rounded-r-2xl text-white/75 transition-colors hover:text-white focus-visible:text-white focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-4 focus-visible:outline-white"
         >
           <Icon name={collapsed ? "arrow-right" : "arrow-left"} style={{ fontSize: 15, strokeWidth: 2.5 }} />
         </button>
