@@ -37,6 +37,7 @@ export default function AccountPage() {
 
   const fullName = [auth?.first_name, auth?.last_name].filter(Boolean).join(" ") || "-";
   const avatarInitial = (auth?.first_name || auth?.username || "?").trim().charAt(0).toUpperCase();
+  const email = auth?.email ?? (auth?.username?.includes("@") ? auth.username : "");
 
   return (
     <>
@@ -90,14 +91,14 @@ export default function AccountPage() {
                     </div>
                     <div className="min-w-0">
                       <p className="truncate text-[16px] font-semibold text-white">{fullName}</p>
-                      <p className="truncate text-[12.5px] text-white/70">{maskEmail(auth?.username)}</p>
+                      <p className="truncate text-[12.5px] text-white/70">{maskEmail(email)}</p>
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 gap-x-6 gap-y-5 p-6 sm:grid-cols-3 sm:p-8">
                     <Field label={t("firstNameLabel")} value={auth?.first_name} />
                     <Field label={t("lastNameLabel")} value={auth?.last_name} />
-                    <Field label={t("emailLabel")} value={maskEmail(auth?.username)} />
+                    <Field label={t("emailLabel")} value={maskEmail(email)} />
                   </div>
                 </div>
               </div>

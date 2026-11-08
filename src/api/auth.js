@@ -16,8 +16,8 @@ function decodeJwtExpiry(token) {
   }
 }
 
-export function saveAuth({ username, token, first_name, last_name }) {
-  const data = { username, token, first_name, last_name, expiresAt: decodeJwtExpiry(token) };
+export function saveAuth({ username, email, token, first_name, last_name }) {
+  const data = { username, email, token, first_name, last_name, expiresAt: decodeJwtExpiry(token) };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   return data;
 }

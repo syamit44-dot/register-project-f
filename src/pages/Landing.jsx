@@ -22,6 +22,16 @@ const languageOptions = [
   { code: "CHN", lang: "zh", image: chaFlag },
 ];
 
+const USERNAME_MAX_LENGTH = 50;
+const USERNAME_PATTERN = /^[A-Za-z0-9]+$/;
+const EMAIL_PATTERN = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
+const SIGNUP_FIELD_ERRORS = {
+  invalid_username: ["username", "signupUsernameRules"],
+  username_taken: ["username", "signupUsernameTaken"],
+  invalid_email: ["email", "signupEmailInvalid"],
+  email_taken: ["email", "signupEmailTaken"],
+};
+
 // รูปสไลด์ฝั่งซ้าย (แบนเนอร์ประชาสัมพันธ์อุปกรณ์) — static ล้วน ไม่ผูก state ของฟอร์ม
 const heroSlides = [
   { src: heroSlide1},
@@ -39,6 +49,7 @@ export default function Landing() {
   const [isAuthExiting, setIsAuthExiting] = useState(false);
   const [homeAnimationKey, setHomeAnimationKey] = useState(0);
   const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [Conpassword, setConPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -200,14 +211,24 @@ export default function Landing() {
     event?.preventDefault();
     setError("");
     setFieldErrors({});
-    if (!username.trim() || !password.trim()) {
-      const nextFieldErrors = {};
-      if (!username.trim()) nextFieldErrors.username = t("pleaseEnterEmailAndPassword");
-      if (!password.trim()) nextFieldErrors.password = t("pleaseEnterEmailAndPassword");
+    const isSignup = authMode === "Sign Up";
+    const nextFieldErrors = {};
+    if (isSignup) {
+      if (username.length > USERNAME_MAX_LENGTH || !USERNAME_PATTERN.test(username)) {
+        nextFieldErrors.username = t("signupUsernameRules");
+      }
+      if (!EMAIL_PATTERN.test(email.trim()) || email.trim().length > 150) {
+        nextFieldErrors.email = t("signupEmailInvalid");
+      }
+    } else if (!username.trim()) {
+      nextFieldErrors.username = t("loginIdentifierRequired");
+    }
+    if (!password.trim()) nextFieldErrors.password = t("authPasswordRequired");
+    if (Object.keys(nextFieldErrors).length > 0) {
       setFieldErrors(nextFieldErrors);
       return;
     }
-    if (authMode === "Sign Up") {
+    if (isSignup) {
       if (password.length < 8) {
         setFieldErrors({ password: t("passwordTooShort") });
         return;
@@ -251,6 +272,7 @@ export default function Landing() {
         });
         saveAuth({
           username: data.username,
+          email: data.email,
           token: data.access_token,
           first_name: data.first_name,
           last_name: data.last_name,
@@ -271,7 +293,8 @@ export default function Landing() {
     try {
       const captchaToken = await captchaRef.current.getToken();
       await signUp({
-        username: username.trim(),
+        username,
+        email: email.trim(),
         password,
         first_name: firstName.trim(),
         last_name: lastName.trim(),
@@ -280,16 +303,23 @@ export default function Landing() {
         accessKey: invitationKey.trim(),
         captcha_token: captchaToken,
       });
-      const signedUpEmail = username.trim();
+      const signedUpEmail = email.trim();
       handleClearData();
       setUsername(signedUpEmail);
       setAuthMode("Sign In");
       setError("");
     } catch (err) {
       captchaRef.current?.reset();
-      setInvitationVerified(false);
-      setSignupStep("verify");
-      setError(err?.response?.data?.error || err?.response?.data?.message || t("signupFailed"));
+      const response = err?.response?.data;
+      const fieldError = SIGNUP_FIELD_ERRORS[response?.code];
+      if (fieldError) {
+        const [field, messageKey] = fieldError;
+        setFieldErrors({ [field]: t(messageKey) });
+      } else {
+        setInvitationVerified(false);
+        setSignupStep("verify");
+        setError(response?.error || response?.message || t("signupFailed"));
+      }
     } finally {
       setAuthLoading(false);
     }
@@ -298,6 +328,7 @@ export default function Landing() {
   const handleClearData = () => {
     setPassword("");
     setUsername("");
+    setEmail("");
     setConPassword("");
     setShowPassword(false);
     setShowConfirmPassword(false);
@@ -975,13 +1006,11 @@ export default function Landing() {
                                 : t("signUp")}
                           </h2>
                           <p className="auth-helper">
-                            {page === "admin"
-                              ? "Review and manage registration requests."
-                              : authMode === "Sign In"
-                                ? "Enter your account details to continue."
-                                : signupStep === "verify"
-                                  ? t("identityVerificationDesc")
-                                  : "Complete your account details to finish registration."}
+                            {authMode === "Sign In"
+                              ? t("loginIdentifierHelp")
+                              : signupStep === "verify"
+                                ? t("identityVerificationDesc")
+                                : "Complete your account details to finish registration."}
                           </p>
                         </div>
                       </div>
@@ -1122,30 +1151,68 @@ export default function Landing() {
                             <div className="mb-5 border-t border-slate-100" />
                           </>
                         )}
-                        <div className="mb-4">
-                          <label className="mb-1.5 block text-[15px] font-medium text-gray-600">{t("email")}<span className="ml-0.5 text-red-700">*</span></label>
-                          <input
-                            type="email"
-                            value={username}
-                            onChange={(e) => {
-                              setUsername(e.target.value);
-                              if (fieldErrors.username) setFieldErrors((prev) => ({ ...prev, username: undefined }));
-                            }}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") {
-                                e.preventDefault();
-                                passwordInputRef.current?.focus();
-                              }
-                            }}
-                            className={`auth-input ${fieldErrors.username ? "auth-input-error" : ""}`}
-                          />
-                          {fieldErrors.username && <p className="mt-1.5 text-[13px] font-medium text-red-600">{fieldErrors.username}</p>}
+                        <div className={authMode === "Sign Up" ? "mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2" : "mb-4"}>
+                          <div>
+                            <label htmlFor="auth-username" className="mb-1.5 block text-[15px] font-medium text-gray-600">
+                              {t(authMode === "Sign Up" ? "signupUsernameLabel" : "loginIdentifierLabel")}<span className="ml-0.5 text-red-700">*</span>
+                            </label>
+                            <input
+                              id="auth-username"
+                              name="username"
+                              type="text"
+                              autoComplete="username"
+                              autoCapitalize="none"
+                              spellCheck={false}
+                              maxLength={authMode === "Sign Up" ? USERNAME_MAX_LENGTH : undefined}
+                              aria-invalid={Boolean(fieldErrors.username)}
+                              aria-describedby={authMode === "Sign Up" ? "auth-username-help" : undefined}
+                              value={username}
+                              onChange={(e) => {
+                                setUsername(e.target.value);
+                                if (fieldErrors.username) setFieldErrors((prev) => ({ ...prev, username: undefined }));
+                              }}
+                              onKeyDown={(e) => {
+                                if (authMode === "Sign In" && e.key === "Enter") {
+                                  e.preventDefault();
+                                  passwordInputRef.current?.focus();
+                                }
+                              }}
+                              className={`auth-input ${fieldErrors.username ? "auth-input-error" : ""}`}
+                            />
+                            {authMode === "Sign Up" && (
+                              <p id="auth-username-help" className="mt-1.5 text-[13px] leading-snug text-slate-500">{t("signupUsernameHelp")}</p>
+                            )}
+                            {fieldErrors.username && <p className="mt-1.5 text-[13px] font-medium text-red-600">{fieldErrors.username}</p>}
+                          </div>
+                          {authMode === "Sign Up" && (
+                            <div>
+                              <label htmlFor="auth-email" className="mb-1.5 block text-[15px] font-medium text-gray-600">
+                                {t("email")}<span className="ml-0.5 text-red-700">*</span>
+                              </label>
+                              <input
+                                id="auth-email"
+                                name="email"
+                                type="email"
+                                autoComplete="email"
+                                maxLength={150}
+                                aria-invalid={Boolean(fieldErrors.email)}
+                                value={email}
+                                onChange={(e) => {
+                                  setEmail(e.target.value);
+                                  if (fieldErrors.email) setFieldErrors((prev) => ({ ...prev, email: undefined }));
+                                }}
+                                className={`auth-input ${fieldErrors.email ? "auth-input-error" : ""}`}
+                              />
+                              {fieldErrors.email && <p className="mt-1.5 text-[13px] font-medium text-red-600">{fieldErrors.email}</p>}
+                            </div>
+                          )}
                         </div>
                         <div className="mb-4">
                           <label className="mb-1.5 block text-[15px] font-medium text-gray-600">{t("password")}<span className="ml-0.5 text-red-700">*</span></label>
                           <div className="relative">
                             <input
                               type={showPassword ? "text" : "password"}
+                              autoComplete={authMode === "Sign Up" ? "new-password" : "current-password"}
                               ref={passwordInputRef}
                               value={password}
                               onChange={(e) => {
@@ -1172,6 +1239,7 @@ export default function Landing() {
                             <div className="relative">
                               <input
                                 type={showConfirmPassword ? "text" : "password"}
+                                autoComplete="new-password"
                                 value={Conpassword}
                                 onChange={(e) => {
                                   setConPassword(e.target.value);

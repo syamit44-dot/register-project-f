@@ -137,7 +137,7 @@ export function checkAccessKey(accessKey) {
 
 // ยิงไปที่ Django Api_SignIn (ต้องมี captcha_token เสมอ ไม่งั้น backend ตอบ 400)
 // isAdmin: true -> ยิง /api/signin/admin (cmd="admin", backend เช็ค is_superuser/is_staff เพิ่ม)
-// สำเร็จ backend จะตอบ { status, username, first_name, last_name, access_token }
+// username ใน request รับได้ทั้งชื่อผู้ใช้และอีเมล
 // และตั้ง cookie httpOnly ชื่อ refresh_token มาด้วย (ใช้กับ /api/refresh)
 export function signIn({ username, password, captcha_token, isAdmin = false }) {
   const path = isAdmin ? "/signin/admin" : "/signin";
@@ -147,11 +147,9 @@ export function signIn({ username, password, captcha_token, isAdmin = false }) {
 /* ---------- Sign up (พร้อม Cloudflare Turnstile + Access Key) ---------- */
 
 // ยิงไปที่ Django Api_SignUp — accessKey บังคับเสมอ (backend ปฏิเสธถ้าไม่มี/ใช้ไปแล้ว)
-// ชื่อ field ต้องตรงกับที่ view อ่านจาก request.data เป๊ะๆ: username, password, accessKey,
-// country, mobile, captcha_token, first_name, last_name
-export function signUp({ username, password, first_name, last_name, mobile, country, accessKey, captcha_token }) {
+export function signUp({ username, email, password, first_name, last_name, mobile, country, accessKey, captcha_token }) {
   return api
-    .post("/signup", { username, password, first_name, last_name, mobile, country, accessKey, captcha_token })
+    .post("/signup", { username, email, password, first_name, last_name, mobile, country, accessKey, captcha_token })
     .then((res) => res.data);
 }
 
