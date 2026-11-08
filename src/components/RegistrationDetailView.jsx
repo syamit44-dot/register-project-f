@@ -225,15 +225,17 @@ export default function RegistrationDetailView({ data, editable = false, draft =
             <div className="font-medium text-ink">{data.note || "-"}</div>
           </div>
         )}
-        <div className="mt-4 flex items-center gap-2 rounded-control bg-mist px-4 py-2.5 text-sm">
-          <span
-            className="h-2 w-2 shrink-0 rounded-full"
-            style={{ backgroundColor: data.pdpa_consent ? "#16a34a" : "#94a3b8" }}
-          />
-          <span className="text-ink">
-            {data.pdpa_consent ? t("pdpaAccepted") : t("pdpaNotAccepted")}
-          </span>
-        </div>
+        {typeof data.pdpa_consent === "boolean" && (
+          <div className="mt-4 flex items-center gap-2 rounded-control bg-mist px-4 py-2.5 text-sm">
+            <span
+              className="h-2 w-2 shrink-0 rounded-full"
+              style={{ backgroundColor: data.pdpa_consent ? "#16a34a" : "#94a3b8" }}
+            />
+            <span className="text-ink">
+              {data.pdpa_consent ? t("pdpaAccepted") : t("pdpaNotAccepted")}
+            </span>
+          </div>
+        )}
       </SectionCard>
     </>
   );

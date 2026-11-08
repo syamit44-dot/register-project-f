@@ -15,6 +15,8 @@ export function IconSprite() {
         <symbol id="i-temperature" viewBox="0 0 24 24"><path d="M10 14V5a2 2 0 0 1 4 0v9"/><circle cx="12" cy="17" r="3"/></symbol>
         <symbol id="i-building-warehouse" viewBox="0 0 24 24"><path d="M4 10 12 4l8 6"/><path d="M5 10v9h14v-9"/><path d="M10 19v-6h4v6"/></symbol>
         <symbol id="i-barn" viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><rect x="10" y="6" width="4" height="4" rx="0.5"/><path d="M8 15a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v6H8z"/><path d="M8 14.5l4 3.5 4-3.5"/><path d="M8 21l4-3.5 4 3.5"/><path d="M1 17.5h4"/><path d="M19 17.5h4"/><path d="M2.5 15.5v4"/><path d="M21.5 15.5v4"/></symbol>
+        <symbol id="i-egg" viewBox="0 0 24 24"><path d="M19 14.5a7 7 0 0 1-14 0C5 10 8.5 3 12 3s7 7 7 11.5Z"/></symbol>
+        <symbol id="i-leaf" viewBox="0 0 24 24"><path d="M20 4C9 4 5 8 5 14a5 5 0 0 0 5 5c6 0 10-4 10-15Z"/><path d="M4 20l10-10"/></symbol>
         <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14"/><path d="M5 12h14"/></symbol>
         <symbol id="i-info-circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><path d="M12 8h.01"/></symbol>
         <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="1"/><path d="M4 10h16"/><path d="M8 3v4"/><path d="M16 3v4"/></symbol>

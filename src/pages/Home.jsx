@@ -1,14 +1,20 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Icon from "../components/Icon";
 import RegistrationModal from "../components/RegistrationModal";
-import { fetchAllFarmsMock } from "../api/client";
+import { fetchUserFarms, updateFarmIcon } from "../api/client";
 import { isAuthenticated, clearAuth } from "../api/auth";
 import { IconSprite } from "../components/IconSprite";
 import { AppShellStyles, SidebarNav, SignOutModal } from "../components/AppShell";
 import { useLanguage } from "../i18n.jsx";
 
 const PLATFORM_LABEL = { smartlink: "SmartLink", tempview: "TempView / FarmNet", silonic: "Silonic-Xi" };
+
+const FARM_ICONS = [
+  { id: 0, name: "barn", label: "farmIconBarn" },
+  { id: 1, name: "egg", label: "farmIconEgg" },
+  { id: 2, name: "leaf", label: "farmIconLeaf" },
+];
 
 const STATUS_TONE = {
   approved: { tint: "#e4f6ee", solid: "#1f8a5c", label: "Approved" },
@@ -32,17 +38,29 @@ function DashboardStatCard({ icon, label, value, accent, tint }) {
 }
 
 // การ์ดฟาร์มของโหมด Dashboard — สรุปข้อมูลฟาร์มแบบกระชับแต่ครบ อ่านง่ายเป็นระบบเดียวกับการ์ดหลัก
-function DashboardFarmCard({ farm, onOpenFarm }) {
+function DashboardFarmCard({ farm, onOpenFarm, onOpenIconPicker }) {
+  const { t } = useLanguage();
   const tone = STATUS_TONE[farm.status] || STATUS_TONE.pending;
+  const icon = FARM_ICONS.find(({ id }) => id === farm.icon_id) ?? FARM_ICONS[0];
   const deviceCount = (farm.houses || []).reduce((s, h) => s + (h.accessories?.length || 0), 0);
   const userCount = (farm.app_users || []).length;
 
   return (
     <div onClick={() => onOpenFarm(farm)} className="dash-card cursor-pointer rounded-xl border border-slate-200 bg-white p-4">
       <div className="flex items-start gap-3">
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-[#185FA5] to-[#0C447C] text-[13px] font-bold text-white">
-          {farm.farm_short}
-        </div>
+        <button
+          type="button"
+          aria-label={t("changeFarmIcon")}
+          aria-haspopup="dialog"
+          title={t("changeFarmIcon")}
+          onClick={(event) => {
+            event.stopPropagation();
+            onOpenIconPicker(farm);
+          }}
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-[#E6F1FB] text-[#185FA5] transition-colors hover:bg-[#D6E8F8] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#185FA5]"
+        >
+          <Icon name={icon.name} style={{ fontSize: 23 }} />
+        </button>
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-2">
             <h3 className="truncate text-[14.5px] font-bold leading-tight text-[#16233D]">{farm.farm_name}</h3>
@@ -87,30 +105,95 @@ function DashboardFarmCard({ farm, onOpenFarm }) {
   );
 }
 
+function FarmIconPicker({ farm, onClose, onSaved }) {
+  const { t } = useLanguage();
+  const dialogRef = useRef(null);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    dialog.showModal();
+    return () => dialog.close();
+  }, []);
+
+  async function pickIcon(iconId) {
+    setSaving(true);
+    setError(false);
+    try {
+      const { icon_id: savedIcon } = await updateFarmIcon(farm.id, iconId);
+      onSaved(farm.id, savedIcon);
+      onClose();
+    } catch {
+      setError(true);
+      setSaving(false);
+    }
+  }
+
+  return (
+    <dialog
+      ref={dialogRef}
+      aria-labelledby="farm-icon-picker-title"
+      onCancel={(event) => {
+        event.preventDefault();
+        if (!saving) onClose();
+      }}
+      className="m-auto w-[min(24rem,calc(100%-2rem))] rounded-xl border border-slate-200 bg-white p-5 text-slate-900 shadow-xl backdrop:bg-slate-900/40"
+    >
+      <div className="mb-4 flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <h2 id="farm-icon-picker-title" className="text-base font-semibold">{t("changeFarmIcon")}</h2>
+          <p className="truncate text-sm text-slate-500">{farm.farm_name}</p>
+        </div>
+        <button type="button" onClick={onClose} disabled={saving} aria-label={t("close")} className="rounded-md p-1 text-slate-500 hover:bg-slate-100">
+          <Icon name="x" style={{ fontSize: 18 }} />
+        </button>
+      </div>
+      <div className="grid grid-cols-3 gap-2">
+        {FARM_ICONS.map(({ id, name, label }) => (
+          <button
+            key={id}
+            type="button"
+            aria-pressed={id === (farm.icon_id ?? 0)}
+            disabled={saving}
+            onClick={() => pickIcon(id)}
+            className="flex min-w-0 flex-col items-center gap-2 rounded-lg border border-slate-200 px-1 py-3 text-sm text-[#185FA5] hover:bg-[#E6F1FB] aria-pressed:border-[#185FA5] aria-pressed:bg-[#E6F1FB] disabled:opacity-60"
+          >
+            <Icon name={name} style={{ fontSize: 24 }} />
+            {t(label)}
+          </button>
+        ))}
+      </div>
+      {error && <p role="alert" className="mt-3 text-sm text-red-700">{t("farmIconSaveError")}</p>}
+    </dialog>
+  );
+}
+
 export default function Home() {
   const navigate = useNavigate();
   const { t } = useLanguage();
   const [farms, setFarms] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [signOutConfirmOpen, setSignOutConfirmOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [detailFarm, setDetailFarm] = useState(null);
+  const [iconFarm, setIconFarm] = useState(null);
 
   useEffect(() => {
     if (!isAuthenticated()) {
       navigate("/");
       return;
     }
-    // ตัวอย่าง: หน้านี้ยิง "API" ตอนโหลดหน้า (ตอนนี้เป็น mock ยังไม่ได้เชื่อมต่อกับ backend จริง)
-    // ใช้ข้อมูลชุดเดียวกับหน้า Admin (fetchAllFarmsMock) เพื่อให้ลูกค้าเห็นข้อมูลฟาร์มครบทุกรายการ
-    fetchAllFarmsMock().then((data) => {
-      setFarms(data);
-      setLoading(false);
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    let active = true;
+    fetchUserFarms()
+      .then((data) => { if (active) setFarms(data); })
+      .catch(() => { if (active) setLoadError(true); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [navigate]);
 
   function handleSignOut() {
     clearAuth();
@@ -135,6 +218,12 @@ export default function Home() {
   // (canModerate=false: ไม่มีปุ่ม Reject/Approve แต่ยังกด Edit + Save ได้ตามปกติ)
   function handleOpenFarm(farm) {
     setDetailFarm(farm);
+  }
+
+  function handleIconSaved(farmId, iconId) {
+    setFarms((prev) => prev.map((farm) => (
+      farm.id === farmId ? { ...farm, icon_id: iconId } : farm
+    )));
   }
 
   // บันทึกการแก้ไขฟาร์ม (mock — เก็บแค่ใน state หน้านี้ ยังไม่ได้บันทึกลง backend จริง)
@@ -280,6 +369,10 @@ export default function Home() {
               <div className="rounded-lg border border-slate-200 bg-white p-10 text-center text-[13.5px] text-slate-500">
                 Loading data...
               </div>
+            ) : loadError ? (
+              <p role="alert" className="rounded-lg border border-red-200 bg-white p-6 text-center text-sm text-red-700">
+                {t("farmListLoadError")}
+              </p>
             ) : farms.length === 0 ? (
               <div className="rounded-lg border border-dashed border-slate-300 bg-white p-10 text-center">
                 <p className="text-sm font-medium text-slate-600">No farms registered yet</p>
@@ -320,7 +413,7 @@ export default function Home() {
                 <div className="dash-scroll min-h-0 flex-1 overflow-y-auto pb-1 pr-1">
                   <div className="grid grid-cols-1 gap-4 pb-4 sm:grid-cols-2">
                     {filteredFarms.map((farm) => (
-                      <DashboardFarmCard key={farm.id} farm={farm} onOpenFarm={handleOpenFarm} />
+                      <DashboardFarmCard key={farm.id} farm={farm} onOpenFarm={handleOpenFarm} onOpenIconPicker={setIconFarm} />
                     ))}
                   </div>
                 </div>
@@ -334,6 +427,10 @@ export default function Home() {
           onCancel={() => setSignOutConfirmOpen(false)}
           onConfirm={handleSignOut}
         />
+
+        {iconFarm && (
+          <FarmIconPicker farm={iconFarm} onClose={() => setIconFarm(null)} onSaved={handleIconSaved} />
+        )}
 
         <RegistrationModal
           registration={detailFarm}

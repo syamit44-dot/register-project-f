@@ -1,6 +1,5 @@
 import axios from "axios";
 import { getToken, getAuth, updateAccessToken, clearAuth } from "./auth";
-import { registrationsMockData } from "../data/registrationsMockData";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000/api";
 
@@ -153,23 +152,70 @@ export function signUp({ username, email, password, first_name, last_name, mobil
     .then((res) => res.data);
 }
 
-/* ---------- หน้า Home: รายการฟาร์มทั้งหมด (mock ตัวอย่าง — ใช้ข้อมูลชุดเดียวกับหน้า Admin) ---------- */
+/* ---------- หน้า Home: ฟาร์มของบัญชีที่เข้าสู่ระบบ ---------- */
 
-// แปลงข้อมูลจาก registrationsMockData (โครงฝั่ง Admin) ให้เป็นรูปแบบ farm summary ที่ฝั่งลูกค้าใช้
-// (house_count_actual -> house_count, และหาเวลาซิงค์ล่าสุดจาก house ที่ซิงค์ล่าสุด)
-function toFarmSummary(r) {
-  const lastSync = (r.houses || []).reduce(
-    (latest, h) => (h.last_sync && (!latest || h.last_sync > latest) ? h.last_sync : latest),
-    null
-  );
-  return { ...r, house_count: r.house_count_actual, last_sync: lastSync || "-" };
+const FARM_STATUSES = { PENDING: "pending", EDIT: "pending", APPROVE: "approved", REJECT: "rejected" };
+
+function toFarmSummary({ farm, device, alarm, egg, silonic, userapp }, modelNames) {
+  const equipment = [
+    ...device.map((item) => ({ ...item, modelId: item.modelTemp })),
+    ...alarm.map((item) => ({ ...item, modelId: item.modelAlarm })),
+    ...egg.map((item) => ({ ...item, modelId: item.modelEgg })),
+    ...silonic.map((item) => ({ ...item, modelId: item.modelSilonic })),
+  ];
+  const houses = new Map();
+  for (const item of equipment) {
+    if (!houses.has(item.house)) {
+      houses.set(item.house, { id: item.house, name: `House ${item.house}`, accessories: [] });
+    }
+    const house = houses.get(item.house);
+    const serial = item.controllerSN || item.serialNumber;
+    house.serial_number ||= serial;
+    house.accessories.push([modelNames.get(item.modelId) ?? item.modelId, serial].filter(Boolean).join(" · "));
+  }
+  const platforms = new Set(equipment.map((item) => item.type.toLowerCase()));
+
+  return {
+    id: farm.id,
+    icon_id: farm.icon_id,
+    farm_name: farm.companyName || farm.nameFarm,
+    farm_short: farm.nameFarm,
+    house_count: Number(farm.numbOfHouse),
+    status: FARM_STATUSES[farm.status] ?? "pending",
+    platform: platforms.size > 1 ? "SmartLink / TempView" : platforms.values().next().value,
+    device_model: [...new Set(device.map((item) => modelNames.get(item.modelTemp) ?? item.modelTemp))].join(", "),
+    address: farm.address1,
+    subdistrict: farm.address2,
+    district: farm.townCity,
+    province: farm.province,
+    country: farm.country,
+    postal_code: farm.postcode,
+    timezone: farm.timezone,
+    contact_name: farm.contact,
+    contact_phone: farm.mobile,
+    contact_email: farm.emailFarm,
+    note: farm.note,
+    created_at: farm.date_created,
+    updated_at: farm.date_edit,
+    houses: [...houses.values()].sort((a, b) => Number(a.id) - Number(b.id)),
+    app_users: userapp.map(({ id, username, userType }) => ({
+      id,
+      username,
+      user_type: userType === "Superuser" ? "super" : "normal",
+    })),
+  };
 }
 
-// คืนรายการฟาร์มทั้งหมด (mock) ให้หน้า Home แสดงครบทุกฟาร์ม เหมือนกับที่หน้า Admin เห็น
-export function fetchAllFarmsMock() {
-  return new Promise((resolve) => {
-    setTimeout(() => resolve(registrationsMockData.map(toFarmSummary)), 700);
-  });
+export async function fetchUserFarms() {
+  const { data: farms } = await api.get("/get-farm/user");
+  if (farms.length === 0) return [];
+  const { data: models } = await api.get("/equipment-models");
+  const modelNames = new Map(models.map(({ id, name }) => [id, name]));
+  return farms.map((farm) => toFarmSummary(farm, modelNames));
+}
+
+export function updateFarmIcon(farmId, iconId) {
+  return api.patch(`/farms/${farmId}/icon`, { icon_id: iconId }).then((res) => res.data);
 }
 
 /* ---------- หน้า Home (mock ตัวอย่าง — ยังไม่ได้ยิง backend จริง) ---------- */
