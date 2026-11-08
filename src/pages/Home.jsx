@@ -11,13 +11,6 @@ import { useLanguage } from "../i18n.jsx";
 
 const PLATFORM_LABEL = { smartlink: "SmartLink", tempview: "TempView / FarmNet", silonic: "Silonic-Xi" };
 
-const STATUS_TONE = {
-  approved: { tint: "#e4f6ee", solid: "#1f8a5c", label: "Approved" },
-  pushed: { tint: "#e4f6ee", solid: "#1f8a5c", label: "Approved" },
-  pending: { tint: "#fbf2de", solid: "#b5820a", label: "Pending" },
-  rejected: { tint: "#fbeae8", solid: "#b23a2e", label: "Rejected" },
-};
-
 const STACK_OFFSET_X = 350;
 
 function cardStyle(distance) {
@@ -111,76 +104,6 @@ function StackCard({ farm, distance, onSelect, onOpenFarm }) {
   );
 }
 
-// การ์ดสถิติของโหมด Dashboard — สรุปตัวเลขรวมทั้งระบบ 4 กล่อง
-function DashboardStatCard({ icon, label, value, accent, tint }) {
-  return (
-    <div className="dash-stat-card relative overflow-hidden rounded-xl border border-slate-200 bg-white p-4">
-      <div className="absolute inset-x-0 top-0 h-[3px]" style={{ background: accent }} />
-      <div className="mb-2.5 flex h-9 w-9 items-center justify-center rounded-lg" style={{ background: tint, color: accent }}>
-        <Icon name={icon} style={{ fontSize: 16 }} />
-      </div>
-      <div className="text-[22px] font-bold leading-none text-[#16233D]">{value}</div>
-      <div className="mt-1 text-[11px] font-medium text-slate-500">{label}</div>
-    </div>
-  );
-}
-
-// การ์ดฟาร์มของโหมด Dashboard — สรุปข้อมูลฟาร์มแบบกระชับแต่ครบ อ่านง่ายเป็นระบบเดียวกับการ์ดหลัก
-function DashboardFarmCard({ farm, onOpenFarm }) {
-  const tone = STATUS_TONE[farm.status] || STATUS_TONE.pending;
-  const deviceCount = (farm.houses || []).reduce((s, h) => s + (h.accessories?.length || 0), 0);
-  const userCount = (farm.app_users || []).length;
-
-  return (
-    <div onClick={() => onOpenFarm(farm)} className="dash-card cursor-pointer rounded-xl border border-slate-200 bg-white p-4">
-      <div className="flex items-start gap-3">
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-[#185FA5] to-[#0C447C] text-[13px] font-bold text-white">
-          {farm.farm_short}
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-start justify-between gap-2">
-            <h3 className="truncate text-[14.5px] font-bold leading-tight text-[#16233D]">{farm.farm_name}</h3>
-            <span className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ background: tone.tint, color: tone.solid }}>
-              {tone.label}
-            </span>
-          </div>
-          <div className="mt-1 flex items-center gap-1 text-[11.5px] text-slate-500">
-            <Icon name="home" style={{ fontSize: 10 }} className="shrink-0 text-[#185FA5]" />
-            <span className="truncate">
-              {farm.province}, {farm.country}
-            </span>
-          </div>
-        </div>
-      </div>
-
-      <div className="mt-3">
-        <span className="rounded-full bg-[#E6F1FB] px-2 py-0.5 text-[10.5px] font-semibold text-[#0C447C]">
-          {PLATFORM_LABEL[farm.platform] || farm.platform}
-        </span>
-      </div>
-
-      <div className="mt-3 grid grid-cols-3 gap-1 border-t border-slate-100 pt-3 text-center">
-        <div>
-          <div className="text-[15px] font-bold leading-none text-[#16233D]">{farm.house_count}</div>
-          <div className="mt-1 text-[10px] text-slate-500">Houses</div>
-        </div>
-        <div>
-          <div className="text-[15px] font-bold leading-none text-[#16233D]">{deviceCount}</div>
-          <div className="mt-1 text-[10px] text-slate-500">Devices</div>
-        </div>
-        <div>
-          <div className="text-[15px] font-bold leading-none text-[#16233D]">{userCount}</div>
-          <div className="mt-1 text-[10px] text-slate-500">Users</div>
-        </div>
-      </div>
-
-      <div className="mt-3 truncate border-t border-slate-100 pt-3 text-[11.5px] text-slate-600">
-        {farm.contact_name} &middot; {farm.contact_phone}
-      </div>
-    </div>
-  );
-}
-
 export default function Home() {
   const navigate = useNavigate();
   const { t } = useLanguage();
@@ -190,7 +113,6 @@ export default function Home() {
   const [signOutConfirmOpen, setSignOutConfirmOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [mode, setMode] = useState("cards");
   const [center, setCenter] = useState(0);
   const [detailFarm, setDetailFarm] = useState(null);
   const touchStartX = useRef(null);
@@ -235,14 +157,14 @@ export default function Home() {
   const goNext = useCallback(() => setCenter((c) => (count === 0 ? 0 : (c + 1) % count)), [count]);
 
   useEffect(() => {
-    if (mode !== "cards" || count <= 1) return;
+    if (count <= 1) return;
     function onKeyDown(e) {
       if (e.key === "ArrowRight") goNext();
       if (e.key === "ArrowLeft") goPrev();
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [mode, count, goNext, goPrev]);
+  }, [count, goNext, goPrev]);
 
   function onTouchStart(e) {
     touchStartX.current = e.touches[0].clientX;
@@ -269,14 +191,6 @@ export default function Home() {
     setDetailFarm((prev) => (prev && prev.id === id ? { ...prev, ...updates, updated_at: today } : prev));
   }
 
-  // สถิติรวมทั้งระบบ — ใช้แสดงในการ์ดสรุปของโหมด Dashboard เท่านั้น
-  const totalHouses = farms.reduce((sum, f) => sum + (Number(f.house_count) || 0), 0);
-  const totalDevices = farms.reduce(
-    (sum, f) => sum + (f.houses || []).reduce((s, h) => s + (h.accessories?.length || 0), 0),
-    0
-  );
-  const totalUsers = farms.reduce((sum, f) => sum + (f.app_users?.length || 0), 0);
-
   // ตัวเลือกกรองสถานะ — แปลงจาก native <select> เดิม (ทำให้หน้าตา dropdown ไปตามธีมของแต่ละ browser
   // ไม่ตรงกับดีไซน์ระบบ) มาเป็น dropdown ที่คุมหน้าตาเองแบบเดียวกับตัวเลือกภาษา
   const [statusMenuOpen, setStatusMenuOpen] = useState(false);
@@ -289,7 +203,7 @@ export default function Home() {
   const currentStatusOption =
     STATUS_FILTER_OPTIONS.find((o) => o.key === statusFilter) ?? STATUS_FILTER_OPTIONS[0];
 
-  // เนื้อหาเสริมของแถบเมนูซ้าย — เหลือเฉพาะค้นหา/กรองสถานะ ใช้ร่วมกันทั้งสองโหมด
+  // เนื้อหาเสริมของแถบเมนูซ้าย — ค้นหา กรองสถานะ และลงทะเบียนฟาร์ม
   const sidebarExtra = !loading && farms.length > 0 && (
     <div className="flex flex-col gap-2.5 pt-2">
       <div className="relative">
@@ -372,18 +286,8 @@ export default function Home() {
         .stack-dot { transition: width 320ms cubic-bezier(0.16,1,0.3,1), background-color 320ms ease; }
         .sidebar-input { transition: background-color 150ms ease, box-shadow 150ms ease, border-color 150ms ease; }
         .sidebar-input:focus { outline: none; background: rgba(255,255,255,0.1) !important; border-color: rgba(255,255,255,0.25) !important; box-shadow: 0 0 0 3px rgba(255,255,255,0.08); }
-        .mode-tab { transition: background-color 200ms ease, color 200ms ease; }
-        .dash-stat-card { transition: transform 200ms cubic-bezier(0.16,1,0.3,1), box-shadow 200ms ease, border-color 200ms ease; }
-        .dash-stat-card:hover { transform: translateY(-2px); box-shadow: 0 14px 26px rgba(15,23,42,0.09); border-color: #b9d3ea; }
-        .dash-card { transition: transform 200ms cubic-bezier(0.16,1,0.3,1), box-shadow 200ms ease, border-color 200ms ease; }
-        .dash-card:hover { transform: translateY(-2px); border-color: #b9d3ea; box-shadow: 0 14px 26px rgba(15,23,42,0.09); }
-        .mode-fade { animation: modeFadeIn 320ms cubic-bezier(0.16,1,0.3,1) both; }
-        @keyframes modeFadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
-        .dash-scroll { scrollbar-width: thin; scrollbar-color: #c7d6e5 transparent; }
-        .dash-scroll::-webkit-scrollbar { width: 6px; }
-        .dash-scroll::-webkit-scrollbar-track { background: transparent; }
-        .dash-scroll::-webkit-scrollbar-thumb { background: #c7d6e5; border-radius: 999px; }
-        .dash-scroll::-webkit-scrollbar-thumb:hover { background: #9db8d3; }
+        .stack-enter { animation: stackEnter 320ms cubic-bezier(0.16,1,0.3,1) both; }
+        @keyframes stackEnter { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
       `}</style>
 
       <div className="flex h-screen overflow-hidden bg-gradient-to-b from-[#eef3f9] to-[#e6edf6]">
@@ -412,7 +316,6 @@ export default function Home() {
             <Icon name="menu" style={{ fontSize: 18 }} />
           </button>
 
-          {/* พื้นที่เนื้อหา — จำกัดความสูงเท่าหน้าจอ ไม่มีการเลื่อนที่ระดับนี้ โหมด Cards ไม่เลื่อน ส่วนโหมด Dashboard จะเลื่อนเฉพาะโซนการ์ดฟาร์มด้านล่างของมันเองเท่านั้น */}
           <div className="mx-auto flex min-h-0 w-full max-w-[1200px] flex-1 flex-col overflow-hidden px-6 pb-6 pt-16 sm:pb-8 sm:pt-8">
             {loading ? (
               <div className="rounded-lg border border-slate-200 bg-white p-10 text-center text-[13.5px] text-slate-500">
@@ -430,112 +333,56 @@ export default function Home() {
                   Register New Farm
                 </button>
               </div>
+            ) : count === 0 ? (
+              <div className="rounded-lg border border-dashed border-slate-300 bg-white p-10 text-center">
+                <p className="text-sm font-medium text-slate-600">No farms match your search</p>
+                <p className="mt-1 text-[12.5px] text-slate-500">Try a different keyword or status filter</p>
+              </div>
             ) : (
-              <div className="flex min-h-0 flex-1 flex-col">
-                {/* สวิตช์ Cards / Dashboard — จัดกึ่งกลาง */}
-                <div className="mb-6 flex shrink-0 justify-center">
-                  <div className="inline-flex rounded-lg border border-slate-200 bg-white p-1 shadow-sm">
-                    <button
-                      type="button"
-                      onClick={() => setMode("cards")}
-                      className={`mode-tab rounded-md px-5 py-2 text-[13px] font-semibold ${
-                        mode === "cards" ? "bg-[#185FA5] text-white shadow-sm" : "text-slate-500 hover:text-slate-700"
-                      }`}
-                    >
-                      Cards
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setMode("dashboard")}
-                      className={`mode-tab rounded-md px-5 py-2 text-[13px] font-semibold ${
-                        mode === "dashboard" ? "bg-[#185FA5] text-white shadow-sm" : "text-slate-500 hover:text-slate-700"
-                      }`}
-                    >
-                      Dashboard
-                    </button>
-                  </div>
+              <div className="stack-enter" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
+                <div className="stack-viewport relative mx-auto h-[660px] max-w-full overflow-hidden sm:h-[720px]">
+                  {filteredFarms.map((farm, i) => (
+                    <StackCard
+                      key={farm.id}
+                      farm={farm}
+                      distance={circularDistance(i, center, count)}
+                      onSelect={() => setCenter(i)}
+                      onOpenFarm={handleOpenFarm}
+                    />
+                  ))}
                 </div>
 
-                {count === 0 ? (
-                  <div className="rounded-lg border border-dashed border-slate-300 bg-white p-10 text-center">
-                    <p className="text-sm font-medium text-slate-600">No farms match your search</p>
-                    <p className="mt-1 text-[12.5px] text-slate-500">Try a different keyword or status filter</p>
-                  </div>
-                ) : mode === "cards" ? (
-                  <div key="cards" className="mode-fade" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
-                    <div className="stack-viewport relative mx-auto h-[660px] max-w-full overflow-hidden sm:h-[720px]">
-                      {filteredFarms.map((farm, i) => (
-                        <StackCard
-                          key={farm.id}
-                          farm={farm}
-                          distance={circularDistance(i, center, count)}
-                          onSelect={() => setCenter(i)}
-                          onOpenFarm={handleOpenFarm}
+                {count > 1 && (
+                  <div className="mt-5 flex items-center justify-center gap-4">
+                    <button
+                      type="button"
+                      onClick={goPrev}
+                      aria-label="Previous farm"
+                      className="stack-nav-btn flex h-10 w-10 items-center justify-center rounded-full border border-[#dfe5eb] bg-white text-[#185FA5]"
+                    >
+                      <Icon name="arrow-left" style={{ fontSize: 15 }} />
+                    </button>
+                    <div className="flex items-center gap-1.5">
+                      {filteredFarms.map((_, i) => (
+                        <button
+                          key={i}
+                          type="button"
+                          onClick={() => setCenter(i)}
+                          aria-label={`Go to farm ${i + 1}`}
+                          className={`stack-dot h-1.5 rounded-full ${
+                            i === center ? "w-6 bg-[#185FA5]" : "w-1.5 bg-[#c7d6e5] hover:bg-[#9db8d3]"
+                          }`}
                         />
                       ))}
                     </div>
-
-                    {count > 1 && (
-                      <div className="mt-5 flex items-center justify-center gap-4">
-                        <button
-                          type="button"
-                          onClick={goPrev}
-                          aria-label="Previous farm"
-                          className="stack-nav-btn flex h-10 w-10 items-center justify-center rounded-full border border-[#dfe5eb] bg-white text-[#185FA5]"
-                        >
-                          <Icon name="arrow-left" style={{ fontSize: 15 }} />
-                        </button>
-                        <div className="flex items-center gap-1.5">
-                          {filteredFarms.map((_, i) => (
-                            <button
-                              key={i}
-                              type="button"
-                              onClick={() => setCenter(i)}
-                              aria-label={`Go to farm ${i + 1}`}
-                              className={`stack-dot h-1.5 rounded-full ${
-                                i === center ? "w-6 bg-[#185FA5]" : "w-1.5 bg-[#c7d6e5] hover:bg-[#9db8d3]"
-                              }`}
-                            />
-                          ))}
-                        </div>
-                        <button
-                          type="button"
-                          onClick={goNext}
-                          aria-label="Next farm"
-                          className="stack-nav-btn flex h-10 w-10 items-center justify-center rounded-full border border-[#dfe5eb] bg-white text-[#185FA5]"
-                        >
-                          <Icon name="arrow-right" style={{ fontSize: 15 }} />
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div key="dashboard" className="mode-fade flex min-h-0 flex-1 flex-col">
-                    {/* Overview — สรุปตัวเลขรวม อยู่นิ่งด้านบนเสมอ */}
-                    <div className="mb-5 shrink-0">
-                      <h2 className="mb-3 text-[12px] font-bold uppercase tracking-[0.08em] text-slate-500">Overview</h2>
-                      <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-4">
-                        <DashboardStatCard icon="building-warehouse" label="Total Farms" value={farms.length} accent="#185FA5" tint="#E6F1FB" />
-                        <DashboardStatCard icon="barn" label="Total Houses" value={totalHouses} accent="#0f8a7e" tint="#e6f7f5" />
-                        <DashboardStatCard icon="router" label="Total Devices" value={totalDevices} accent="#7c5cd6" tint="#f1eefb" />
-                        <DashboardStatCard icon="shield-check" label="Total Users" value={totalUsers} accent="#b5820a" tint="#fbf2de" />
-                      </div>
-                    </div>
-
-                    {/* หัวข้อรายการฟาร์ม — อยู่นิ่งเช่นกัน มีแค่โซนการ์ดด้านล่างที่เลื่อนได้ */}
-                    <div className="mb-3 flex shrink-0 items-center justify-between">
-                      <h2 className="text-[12px] font-bold uppercase tracking-[0.08em] text-slate-500">Farms</h2>
-                      <span className="text-[12px] text-slate-500">{count} total</span>
-                    </div>
-
-                    {/* โซนการ์ดฟาร์ม — เลื่อนได้เฉพาะส่วนนี้ ไม่กระทบส่วนอื่นของหน้า และไม่กระทบขนาดการ์ด */}
-                    <div className="dash-scroll min-h-0 flex-1 overflow-y-auto pb-1 pr-1">
-                      <div className="grid grid-cols-1 gap-4 pb-4 sm:grid-cols-2">
-                        {filteredFarms.map((farm) => (
-                          <DashboardFarmCard key={farm.id} farm={farm} onOpenFarm={handleOpenFarm} />
-                        ))}
-                      </div>
-                    </div>
+                    <button
+                      type="button"
+                      onClick={goNext}
+                      aria-label="Next farm"
+                      className="stack-nav-btn flex h-10 w-10 items-center justify-center rounded-full border border-[#dfe5eb] bg-white text-[#185FA5]"
+                    >
+                      <Icon name="arrow-right" style={{ fontSize: 15 }} />
+                    </button>
                   </div>
                 )}
               </div>
