@@ -1,8 +1,11 @@
 import { useEffect, useState } from "react";
 import Icon from "./Icon";
+import SearchableSelect from "./SearchableSelect";
 import countryData from "../data/countryData";
 import DealerContactModal from "./DealerContactModal";
 import { useLanguage } from "../i18n.jsx";
+
+const HOUSE_COUNT_OPTIONS = Array.from({ length: 90 }, (_, i) => ({ value: i + 1, label: String(i + 1) }));
 
 // สไตล์กลางของ input/select/label ในหน้านี้ — รวมไว้ที่เดียวเพื่อให้หน้าตาสม่ำเสมอ อ่านง่าย และแก้ทีเดียวได้ทั้งฟอร์ม
 const inputClass =
@@ -187,15 +190,13 @@ export default function Step1CustomerInfo({ data, onChange }) {
               onChange={set("farm_short")}
             />
           </Field>
-          <Field label={t("numberOfHouses")} required>
-            <select className={inputClass} value={data.house_count} onChange={set("house_count")}>
-              {Array.from({ length: 90 }, (_, i) => (
-                <option key={i + 1} value={i + 1}>
-                  {i + 1}
-                </option>
-              ))}
-            </select>
-          </Field>
+          <SearchableSelect
+            label={t("numberOfHouses")}
+            required
+            value={Number(data.house_count)}
+            options={HOUSE_COUNT_OPTIONS}
+            onChange={({ value }) => onChange({ ...data, house_count: value })}
+          />
         </div>
 
         <SectionHeading icon="building-store" title={t("address")} />

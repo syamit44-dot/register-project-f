@@ -203,7 +203,7 @@ export default function CustomerForm() {
                   </div>
 
                   <div className={`${current === 1 ? "block" : "hidden"}`}>
-                    <Step2DeviceInfo data={data} onChange={setData} />
+                    <Step2DeviceInfo active={current === 1} data={data} onChange={setData} />
                     <StepFooter onBack={back} onNext={next} nextLabel={t("next")} />
                   </div>
 

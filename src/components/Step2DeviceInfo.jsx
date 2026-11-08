@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Icon from "./Icon";
+import SearchableSelect from "./SearchableSelect";
+import { fetchEquipmentModels } from "../api/client";
 import modelData from "../data/modelData";
 import modelAlarmData from "../data/modelAlarm";
 import modelEggCounterData from "../data/modelEggCounter";
@@ -18,21 +20,14 @@ const ALARM_OPTIONS = [
   { key: "alarm05", label: "Alarm 05" },
 ];
 
-// key ของ ALARM_OPTIONS ("alarm04") ไม่ตรงกับ key ใน data/modelAlarm.js ("Alarm-04") — ใช้ตารางนี้แปลงไปมา
-const ALARM_KEY_TO_IMAGE_KEY = {
-  alarm04: "Alarm-04",
-  alarm05: "Alarm-05",
-};
+const LEGACY_EGG_CODES = ["Egg-Ai1", "Egg-C12"];
 
-const modelEggData = [
-  { key: "Egg-Ai1", label: "Egg-Ai1" },
-  { key: "Egg-C12", label: "Egg-C12" },
-];
-const modelSilonicData = [
-  { key: "Silonic-Xi", label: "Silonic-Xi" }
-];
-
-const EGG_MODEL_OPTIONS = modelEggData.map((egg) => egg.key);
+function findArtwork(artwork, item) {
+  if (!item) return undefined;
+  const normalize = (value) => value.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const candidates = [item.model_name, item.model, item.key].filter(Boolean).map(normalize);
+  return Object.entries(artwork).find(([key]) => candidates.includes(normalize(key)))?.[1];
+}
 
 function emptyCommunication() {
   return { tempview: false, smartlink: false };
@@ -103,8 +98,7 @@ function normalizeHouse(h) {
     base.alarms = [];
   }
 
-  base.egg_models = base.egg_models.filter((dm) => EGG_MODEL_OPTIONS.includes(dm?.model));
-  base.device_models = base.device_models.filter((dm) => !EGG_MODEL_OPTIONS.includes(dm?.model));
+  base.device_models = base.device_models.filter((dm) => dm?.model_id || !LEGACY_EGG_CODES.includes(dm?.model));
 
   if ((!base.silonic_models || base.silonic_models.length === 0) && Array.isArray(h.silonic)) {
     base.silonic_models = h.silonic.map(s => ({
@@ -137,6 +131,8 @@ function normalizeHouse(h) {
 function copyEquipmentModels(source, target, modelKey) {
   return source.map((item, index) => ({
     [modelKey]: item[modelKey],
+    model_id: item.model_id,
+    model_name: item.model_name,
     serial_number: target[index]?.[modelKey] === item[modelKey]
       ? target[index]?.serial_number ?? ""
       : "",
@@ -187,23 +183,23 @@ function communicationBadgeLabels(communication, t) {
 function summarizeAlarms(alarms) {
   if (!alarms || alarms.length === 0) return "";
   return alarms
-    .map((a) => ALARM_OPTIONS.find((o) => o.key === a.key)?.label ?? a.key)
+    .map((a) => a.model_name ?? ALARM_OPTIONS.find((o) => o.key === a.key)?.label ?? a.key)
     .join(", ");
 }
 
 function summarizeModels(deviceModels) {
   if (!deviceModels || deviceModels.length === 0) return "";
-  return deviceModels.map((dm) => modelData[dm.model]?.name ?? dm.model).join(", ");
+  return deviceModels.map((dm) => dm.model_name ?? modelData[dm.model]?.name ?? dm.model).join(", ");
 }
 
 function summarizeEggModels(eggModels) {
   if (!eggModels || eggModels.length === 0) return "";
-  return eggModels.map((dm) => modelData[dm.model]?.name ?? dm.model).join(", ");
+  return eggModels.map((dm) => dm.model_name ?? dm.model).join(", ");
 }
 
 function summarizeSilonic(silonicModels) {
   if (!silonicModels || silonicModels.length === 0) return "";
-  return silonicModels.map((dm) => modelData[dm.model]?.name ?? dm.model).join(", ");
+  return silonicModels.map((dm) => dm.model_name ?? dm.model).join(", ");
 }
 
 function ModelImagePreview({ image, svgHtml, name }) {
@@ -232,7 +228,7 @@ function ModelImagePreview({ image, svgHtml, name }) {
   );
 }
 
-export default function Step2DeviceInfo({ data, onChange }) {
+export default function Step2DeviceInfo({ active, data, onChange }) {
   const { t } = useLanguage();
   const [editingIndex, setEditingIndex] = useState(null);
   const [draft, setDraft] = useState(null);
@@ -242,8 +238,25 @@ export default function Step2DeviceInfo({ data, onChange }) {
   const [selectedSilonic, setSelectedSilonic] = useState([]);
   const [showHouseListInfo, setShowHouseListInfo] = useState(false);
   const copyDialogRef = useRef(null);
+  const copyCancelRef = useRef(null);
   const [copySourceIndex, setCopySourceIndex] = useState(null);
   const [copyTargets, setCopyTargets] = useState([]);
+  const [equipmentModels, setEquipmentModels] = useState([]);
+  const [catalogState, setCatalogState] = useState("loading");
+
+  useEffect(() => {
+    if (!active) return;
+    let ignore = false;
+    setCatalogState("loading");
+    fetchEquipmentModels().then((models) => {
+      if (ignore) return;
+      setEquipmentModels(models);
+      setCatalogState("ready");
+    }).catch(() => {
+      if (!ignore) setCatalogState("error");
+    });
+    return () => { ignore = true; };
+  }, [active]);
 
   const houses = useMemo(() => (data.houses ?? []).map(normalizeHouse), [data.houses]);
   const copySources = houses.flatMap((house, index) => (
@@ -297,6 +310,7 @@ export default function Step2DeviceInfo({ data, onChange }) {
     setCopySourceIndex(copySources[0] ?? null);
     setCopyTargets([]);
     copyDialogRef.current.showModal();
+    copyCancelRef.current.focus();
   }
 
   function applyHouseSettings() {
@@ -323,13 +337,20 @@ export default function Step2DeviceInfo({ data, onChange }) {
     });
   }
 
-  function handleDeviceModelSelect(modelKey) {
-    setSelectedModel(modelKey);
+  function selectedEquipment(option, key, previous) {
+    return option.value ? [{
+      [key]: option.value,
+      model_id: option.id,
+      model_name: option.label,
+      serial_number: previous?.serial_number ?? "",
+    }] : [];
+  }
+
+  function handleDeviceModelSelect(option) {
+    setSelectedModel(option.value);
     setDraft((prev) => ({
       ...prev,
-      device_models: modelKey
-        ? [{ model: modelKey, serial_number: prev.device_models?.[0]?.serial_number ?? "" }]
-        : [],
+      device_models: selectedEquipment(option, "model", prev.device_models?.[0]),
     }));
   }
 
@@ -344,11 +365,9 @@ export default function Step2DeviceInfo({ data, onChange }) {
     }));
   }
 
-  function handleEggModelSelect(modelKey) {
+  function handleEggModelSelect(option) {
     setDraft((prev) => {
-      const nextEggModels = modelKey
-        ? [{ model: modelKey, serial_number: prev.egg_models?.[0]?.serial_number ?? "" }]
-        : [];
+      const nextEggModels = selectedEquipment(option, "model", prev.egg_models?.[0]);
       setSelectedEggModels(nextEggModels);
       return { ...prev, egg_models: nextEggModels };
     });
@@ -357,17 +376,15 @@ export default function Step2DeviceInfo({ data, onChange }) {
   function handleEggSerialChange(value) {
     setDraft((prev) => {
       const currentModel = prev.egg_models?.[0]?.model || selectedEggModels[0]?.model || "";
-      const nextEggModels = currentModel ? [{ model: currentModel, serial_number: value }] : [];
+      const nextEggModels = currentModel ? [{ ...prev.egg_models?.[0], model: currentModel, serial_number: value }] : [];
       setSelectedEggModels(nextEggModels);
       return { ...prev, egg_models: nextEggModels };
     });
   }
 
-  function handleAlarmSelect(alarmKey) {
+  function handleAlarmSelect(option) {
     setDraft((prev) => {
-      const nextAlarms = alarmKey
-        ? [{ key: alarmKey, serial_number: prev.alarms?.[0]?.serial_number ?? "" }]
-        : [];
+      const nextAlarms = selectedEquipment(option, "key", prev.alarms?.[0]);
       setSelectedAlarms(nextAlarms);
       return { ...prev, alarms: nextAlarms };
     });
@@ -376,22 +393,15 @@ export default function Step2DeviceInfo({ data, onChange }) {
   function handleAlarmSerialChange(value) {
     setDraft((prev) => {
       const currentKey = prev.alarms?.[0]?.key || selectedAlarms[0]?.key || "";
-      const nextAlarms = currentKey ? [{ key: currentKey, serial_number: value }] : [];
+      const nextAlarms = currentKey ? [{ ...prev.alarms?.[0], key: currentKey, serial_number: value }] : [];
       setSelectedAlarms(nextAlarms);
       return { ...prev, alarms: nextAlarms };
     });
   }
 
-  function handleSilonicSelect(silonicKey) {
+  function handleSilonicSelect(option) {
     setDraft((prev) => {
-      const nextSilonic = silonicKey
-        ? [
-            {
-              model: silonicKey,
-              serial_number: prev.silonic_models?.[0]?.serial_number ?? "",
-            },
-          ]
-        : [];
+      const nextSilonic = selectedEquipment(option, "model", prev.silonic_models?.[0]);
 
       setSelectedSilonic(nextSilonic);
 
@@ -412,6 +422,7 @@ export default function Step2DeviceInfo({ data, onChange }) {
       const nextSilonic = currentKey
         ? [
             {
+              ...prev.silonic_models?.[0],
               model: currentKey,
               serial_number: value,
             },
@@ -426,6 +437,29 @@ export default function Step2DeviceInfo({ data, onChange }) {
         silonic_serial_number: value,
       };
     });
+  }
+
+  function renderModelSelect(category, value, valueLabel, onChange) {
+    const options = equipmentModels
+      .filter((model) => model.category === category)
+      .map(({ id, code, name }) => ({ id, value: code, label: name, keywords: code }));
+    const placeholder = catalogState === "loading" ? t("loading") : t("selectModelPlaceholder");
+    return (
+      <>
+        <SearchableSelect
+          label={t("selectDeviceModel")}
+          required
+          placeholder={placeholder}
+          value={value}
+          valueLabel={valueLabel}
+          options={value ? [{ value: "", label: t("selectModelPlaceholder") }, ...options] : options}
+          onChange={onChange}
+          disabled={catalogState !== "ready" || options.length === 0}
+        />
+        {catalogState === "error" && <p role="alert" className="mt-1 text-xs text-alert">{t("equipmentCatalogError")}</p>}
+        {catalogState === "ready" && options.length === 0 && <p className="mt-1 text-xs text-ink-soft">{t("equipmentCatalogEmpty")}</p>}
+      </>
+    );
   }
 
   // Render ตัวเลือกการเชื่อมต่อ (TempView / SmartLink) สำหรับหัวข้อใดหัวข้อหนึ่งโดยเฉพาะ
@@ -655,20 +689,15 @@ export default function Step2DeviceInfo({ data, onChange }) {
           <p className="text-sm text-ink-soft">{t("copyHouseNoSource")}</p>
         ) : (
           <div className="space-y-4">
-            <label className="block text-sm font-semibold">
-              {t("copyHouseSource")}
-              <select
-                value={copySourceIndex ?? ""}
-                onChange={(event) => {
-                  const index = Number(event.target.value);
-                  setCopySourceIndex(index);
-                  setCopyTargets((targets) => targets.filter((target) => target !== index));
-                }}
-                className="mt-1.5 h-10 w-full rounded-lg border border-line-strong bg-white px-3"
-              >
-                {copySources.map((index) => <option key={index} value={index}>{houses[index].name}</option>)}
-              </select>
-            </label>
+            <SearchableSelect
+              label={t("copyHouseSource")}
+              value={copySourceIndex}
+              options={copySources.map((index) => ({ value: index, label: houses[index].name }))}
+              onChange={({ value: index }) => {
+                setCopySourceIndex(index);
+                setCopyTargets((targets) => targets.filter((target) => target !== index));
+              }}
+            />
             <fieldset>
               <legend className="mb-2 text-sm font-semibold">{t("copyHouseTargets")}</legend>
               <div className="max-h-52 space-y-1 overflow-y-auto rounded-lg border border-line p-1">
@@ -692,7 +721,7 @@ export default function Step2DeviceInfo({ data, onChange }) {
           </div>
         )}
         <div className="mt-5 flex flex-wrap justify-end gap-2">
-          <button type="button" onClick={() => copyDialogRef.current.close()} className="rounded-lg border border-line-strong px-4 py-2 text-sm font-medium hover:bg-mist">
+          <button ref={copyCancelRef} type="button" onClick={() => copyDialogRef.current.close()} className="rounded-lg border border-line-strong px-4 py-2 text-sm font-medium hover:bg-mist">
             {t("cancel")}
           </button>
           <button
@@ -734,21 +763,7 @@ export default function Step2DeviceInfo({ data, onChange }) {
                       <div className="flex-1">
                         <div className="flex gap-3">
                           <div className="flex-1">
-                            <label className="block text-[13px] font-semibold text-ink">
-                              {t("selectDeviceModel")}<span className="ml-0.5 text-alert">*</span>
-                              <select
-                                className="mt-1.5 h-11 w-full rounded-xl border border-line-strong bg-white px-3.5 text-[13.5px] text-ink shadow-sm outline-none transition hover:border-brand/50 focus:border-brand focus:ring-4 focus:ring-brand-tint"
-                                value={selectedModel}
-                                onChange={(e) => handleDeviceModelSelect(e.target.value)}
-                              >
-                                <option value="">{t("selectModelPlaceholder")}</option>
-                                {Object.keys(modelData).map((model) => (
-                                  <option key={model} value={model}>
-                                    {modelData[model].name}
-                                  </option>
-                                ))}
-                              </select>
-                            </label>
+                            {renderModelSelect("CONTROLLER", selectedModel, draft.device_models[0]?.model_name ?? modelData[selectedModel]?.name ?? selectedModel, handleDeviceModelSelect)}
                           </div>
                           <div className="flex-1">
                             <label className="block text-[13px] font-semibold text-ink">
@@ -767,8 +782,8 @@ export default function Step2DeviceInfo({ data, onChange }) {
                         {renderCommunicationPicker("device_communication", { showSmartlinkSerial: true })}
                       </div>
                       <ModelImagePreview
-                        svgHtml={selectedModel ? modelData[selectedModel]?.svg : null}
-                        name={selectedModel ? modelData[selectedModel]?.name : ""}
+                        svgHtml={findArtwork(modelData, draft.device_models[0])?.svg}
+                        name={draft.device_models[0]?.model_name ?? modelData[selectedModel]?.name ?? ""}
                       />
                     </div>
                   )}
@@ -790,21 +805,7 @@ export default function Step2DeviceInfo({ data, onChange }) {
                       <div className="flex-1">
                         <div className="flex gap-3">
                           <div className="flex-1">
-                            <label className="block text-[13px] font-semibold text-ink">
-                              {t("selectDeviceModel")}<span className="ml-0.5 text-alert">*</span>
-                              <select
-                                className="mt-1.5 h-11 w-full rounded-xl border border-line-strong bg-white px-3.5 text-[13.5px] text-ink shadow-sm outline-none transition hover:border-brand/50 focus:border-brand focus:ring-4 focus:ring-brand-tint"
-                                value={selectedAlarms[0]?.key || ""}
-                                onChange={(e) => handleAlarmSelect(e.target.value)}
-                              >
-                                <option value="">{t("selectModelPlaceholder")}</option>
-                                {ALARM_OPTIONS.map((alarm) => (
-                                  <option key={alarm.key} value={alarm.key}>
-                                    {alarm.label}
-                                  </option>
-                                ))}
-                              </select>
-                            </label>
+                            {renderModelSelect("ALARM", selectedAlarms[0]?.key || "", selectedAlarms[0]?.model_name ?? summarizeAlarms(selectedAlarms), handleAlarmSelect)}
                           </div>
                           <div className="flex-1">
                             <label className="block text-[13px] font-semibold text-ink">
@@ -823,8 +824,8 @@ export default function Step2DeviceInfo({ data, onChange }) {
                         {renderCommunicationPicker("alarm_communication")}
                       </div>
                       <ModelImagePreview
-                        image={selectedAlarms[0]?.key ? modelAlarmData[ALARM_KEY_TO_IMAGE_KEY[selectedAlarms[0].key]]?.image : null}
-                        name={selectedAlarms[0]?.key ? modelAlarmData[ALARM_KEY_TO_IMAGE_KEY[selectedAlarms[0].key]]?.name : ""}
+                        image={findArtwork(modelAlarmData, selectedAlarms[0])?.image}
+                        name={summarizeAlarms(selectedAlarms)}
                       />
                     </div>
                   )}
@@ -846,21 +847,7 @@ export default function Step2DeviceInfo({ data, onChange }) {
                       <div className="flex-1">
                         <div className="flex gap-3">
                           <div className="flex-1">
-                            <label className="block text-[13px] font-semibold text-ink">
-                              {t("selectDeviceModel")}<span className="ml-0.5 text-alert">*</span>
-                              <select
-                                className="mt-1.5 h-11 w-full rounded-xl border border-line-strong bg-white px-3.5 text-[13.5px] text-ink shadow-sm outline-none transition hover:border-brand/50 focus:border-brand focus:ring-4 focus:ring-brand-tint"
-                                value={selectedSilonic[0]?.model || ""}
-                                onChange={(e) => handleSilonicSelect(e.target.value)}
-                              >
-                                <option value="">{t("selectModelPlaceholder")}</option>
-                                {modelSilonicData.map((silonic) => (
-                                  <option key={silonic.key} value={silonic.key}>
-                                    {silonic.label}
-                                  </option>
-                                ))}
-                              </select>
-                            </label>
+                            {renderModelSelect("SILONIC", selectedSilonic[0]?.model || "", selectedSilonic[0]?.model_name ?? selectedSilonic[0]?.model, handleSilonicSelect)}
                           </div>
                           <div className="flex-1">
                             <label className="block text-[13px] font-semibold text-ink">
@@ -879,8 +866,8 @@ export default function Step2DeviceInfo({ data, onChange }) {
                         {renderCommunicationPicker("silonic_communication")}
                       </div>
                       <ModelImagePreview
-                        image={selectedSilonic[0]?.model ? modelWeightScaleData[selectedSilonic[0].model]?.image : null}
-                        name={selectedSilonic[0]?.model ? modelWeightScaleData[selectedSilonic[0].model]?.name : ""}
+                        image={findArtwork(modelWeightScaleData, selectedSilonic[0])?.image}
+                        name={summarizeSilonic(selectedSilonic)}
                       />
                     </div>
                   )}
@@ -902,21 +889,7 @@ export default function Step2DeviceInfo({ data, onChange }) {
                       <div className="flex-1">
                         <div className="flex gap-3">
                           <div className="flex-1">
-                            <label className="block text-[13px] font-semibold text-ink">
-                              {t("selectDeviceModel")}<span className="ml-0.5 text-alert">*</span>
-                              <select
-                                className="mt-1.5 h-11 w-full rounded-xl border border-line-strong bg-white px-3.5 text-[13.5px] text-ink shadow-sm outline-none transition hover:border-brand/50 focus:border-brand focus:ring-4 focus:ring-brand-tint"
-                                value={selectedEggModels[0]?.model || ""}
-                                onChange={(e) => handleEggModelSelect(e.target.value)}
-                              >
-                                <option value="">{t("selectModelPlaceholder")}</option>
-                                {modelEggData.map((egg) => (
-                                  <option key={egg.key} value={egg.key}>
-                                    {egg.label}
-                                  </option>
-                                ))}
-                              </select>
-                            </label>
+                            {renderModelSelect("EGG", selectedEggModels[0]?.model || "", selectedEggModels[0]?.model_name ?? selectedEggModels[0]?.model, handleEggModelSelect)}
                           </div>
                           <div className="flex-1">
                             <label className="block text-[13px] font-semibold text-ink">
@@ -935,8 +908,8 @@ export default function Step2DeviceInfo({ data, onChange }) {
                         {renderCommunicationPicker("egg_communication")}
                       </div>
                       <ModelImagePreview
-                        image={selectedEggModels[0]?.model ? modelEggCounterData[selectedEggModels[0].model]?.image : null}
-                        name={selectedEggModels[0]?.model ? modelEggCounterData[selectedEggModels[0].model]?.name : ""}
+                        image={findArtwork(modelEggCounterData, selectedEggModels[0])?.image}
+                        name={summarizeEggModels(selectedEggModels)}
                       />
                     </div>
                   )}

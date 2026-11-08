@@ -206,10 +206,14 @@ function toFarmSummary({ farm, device, alarm, egg, silonic, userapp }, modelName
   };
 }
 
+export function fetchEquipmentModels() {
+  return api.get("/equipment-models").then((res) => res.data);
+}
+
 export async function fetchUserFarms() {
   const { data: farms } = await api.get("/get-farm/user");
   if (farms.length === 0) return [];
-  const { data: models } = await api.get("/equipment-models");
+  const models = await fetchEquipmentModels();
   const modelNames = new Map(models.map(({ id, name }) => [id, name]));
   return farms.map((farm) => toFarmSummary(farm, modelNames));
 }

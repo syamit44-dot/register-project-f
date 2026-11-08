@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Icon from "./Icon";
 import modelData from "../data/modelData";
+import { getSelectedControllerModels } from "../utils/registrationModels";
 import { useLanguage } from "../i18n.jsx";
 
 const USER_TYPE_LABEL = { normal: "User", super: "Super user" };
@@ -18,22 +19,22 @@ const ALARM_OPTIONS = [
 
 function summarizeModels(deviceModels) {
   if (!deviceModels || deviceModels.length === 0) return "";
-  return deviceModels.map((dm) => modelData[dm.model]?.name ?? dm.model).join(", ");
+  return deviceModels.map((dm) => dm.model_name ?? modelData[dm.model]?.name ?? dm.model).join(", ");
 }
 
 function summarizeEggModels(eggModels) {
   if (!eggModels || eggModels.length === 0) return "";
-  return eggModels.map((dm) => modelData[dm.model]?.name ?? dm.model).join(", ");
+  return eggModels.map((dm) => dm.model_name ?? dm.model).join(", ");
 }
 
 function summarizeSilonic(silonicModels) {
   if (!silonicModels || silonicModels.length === 0) return "";
-  return silonicModels.map((dm) => modelData[dm.model]?.name ?? dm.model).join(", ");
+  return silonicModels.map((dm) => dm.model_name ?? dm.model).join(", ");
 }
 
 function summarizeAlarms(alarms) {
   if (!alarms || alarms.length === 0) return "";
-  return alarms.map((a) => ALARM_OPTIONS.find((o) => o.key === a.key)?.label ?? a.key).join(", ");
+  return alarms.map((a) => a.model_name ?? ALARM_OPTIONS.find((o) => o.key === a.key)?.label ?? a.key).join(", ");
 }
 
 function summarizeCommunication(communication, t) {
@@ -63,21 +64,10 @@ function mergeCommunications(...comms) {
   return merged;
 }
 
-function getSelectedModelKeys(houses) {
-  const keys = [];
-  (houses ?? []).forEach((h) => {
-    if (!h?.model_enabled) return;
-    (h.device_models ?? []).forEach((dm) => {
-      if (dm?.model && !keys.includes(dm.model)) keys.push(dm.model);
-    });
-  });
-  return keys;
-}
-
-function groupUsersByModel(appUsers, selectedModelKeys) {
-  return selectedModelKeys.map((key) => ({
+function groupUsersByModel(appUsers, selectedModels) {
+  return Array.from(selectedModels, ([key, label]) => ({
     key,
-    label: modelData[key]?.name ?? key,
+    label,
     users: appUsers.filter((u) => u.device_model === key),
   }));
 }
@@ -219,10 +209,10 @@ export default function Step4Confirm({ data, onChange, onGoTo }) {
   const dealerContactParts = summarizeDealerContact(data, t);
   const houses = data.houses ?? [];
   const appUsers = data.app_users ?? [];
-  const selectedModelKeys = useMemo(() => getSelectedModelKeys(houses), [houses]);
+  const selectedModels = useMemo(() => getSelectedControllerModels(houses), [houses]);
   const userGroups = useMemo(
-    () => groupUsersByModel(appUsers, selectedModelKeys),
-    [appUsers, selectedModelKeys]
+    () => groupUsersByModel(appUsers, selectedModels),
+    [appUsers, selectedModels]
   );
 
   const handlePdpaCheckboxChange = (e) => {

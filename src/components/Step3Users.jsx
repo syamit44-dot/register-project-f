@@ -1,22 +1,10 @@
 import { useMemo, useState } from "react";
 import Icon from "./Icon";
-import modelData from "../data/modelData";
+import SearchableSelect from "./SearchableSelect";
+import { getSelectedControllerModels } from "../utils/registrationModels";
 import { useLanguage } from "../i18n.jsx";
 
 const USER_LIMIT = 5;
-
-// รวบรวม Device Model ที่ถูกเลือกไว้จริงในหน้าข้อมูลเครื่อง (Step 2)
-// เรียงตามลำดับ house/รุ่นที่เจอก่อน และตัดตัวซ้ำออก
-function getSelectedModelKeys(houses) {
-  const keys = [];
-  (houses ?? []).forEach((h) => {
-    if (!h?.model_enabled) return;
-    (h.device_models ?? []).forEach((dm) => {
-      if (dm?.model && !keys.includes(dm.model)) keys.push(dm.model);
-    });
-  });
-  return keys;
-}
 
 export default function Step3Users({ data, onChange }) {
   const { t } = useLanguage();
@@ -25,14 +13,14 @@ export default function Step3Users({ data, onChange }) {
   // (ไม่ต้องระบุใน state ก็ถือว่าขยายอยู่ ยกเว้นจะถูกเพิ่มลง collapsedGroups)
   const [collapsedGroups, setCollapsedGroups] = useState(() => new Set());
 
-  const selectedModelKeys = useMemo(() => getSelectedModelKeys(data.houses), [data.houses]);
+  const selectedModels = useMemo(() => getSelectedControllerModels(data.houses), [data.houses]);
 
   // จัดกลุ่ม app_users ตาม device_model — คนที่ไม่มี device_model หรือ device_model
   // ไม่ตรงกับรุ่นที่เลือกไว้ในตอนนี้ (เช่น ลบรุ่นออกจาก Step 2 ไปแล้ว) จะตกไปกลุ่ม "ทั่วไป"
   const groups = useMemo(() => {
-    const modelGroups = selectedModelKeys.map((key) => ({
+    const modelGroups = Array.from(selectedModels, ([key, label]) => ({
       key,
-      label: modelData[key]?.name ?? key,
+      label,
       users: data.app_users
         .map((u, index) => ({ ...u, index }))
         .filter((u) => u.device_model === key),
@@ -40,21 +28,21 @@ export default function Step3Users({ data, onChange }) {
 
     const unassigned = data.app_users
       .map((u, index) => ({ ...u, index }))
-      .filter((u) => !u.device_model || !selectedModelKeys.includes(u.device_model));
+      .filter((u) => !selectedModels.has(u.device_model));
 
     return [
       ...modelGroups,
       { key: "__unassigned__", label: t("unassignedGroup"), users: unassigned },
     ];
-  }, [data.app_users, selectedModelKeys, t]);
+  }, [data.app_users, selectedModels, t]);
 
   // เฉพาะกลุ่มที่จะแสดงจริงบนหน้าจอ (ตัดกลุ่ม "ทั่วไป" ออกถ้ามีการเลือกรุ่นเครื่องแล้ว)
   const visibleGroups = useMemo(
     () =>
       groups.filter(
-        (group) => !(group.key === "__unassigned__" && selectedModelKeys.length > 0)
+          (group) => !(group.key === "__unassigned__" && selectedModels.size > 0)
       ),
-    [groups, selectedModelKeys]
+    [groups, selectedModels]
   );
 
   const allCollapsed =
@@ -82,7 +70,7 @@ export default function Step3Users({ data, onChange }) {
     const isUnassigned = groupKey === "__unassigned__";
     const countInGroup = data.app_users.filter((u) =>
       isUnassigned
-        ? !u.device_model || !selectedModelKeys.includes(u.device_model)
+        ? !selectedModels.has(u.device_model)
         : u.device_model === groupKey
     ).length;
     if (countInGroup >= USER_LIMIT) return;
@@ -162,7 +150,7 @@ export default function Step3Users({ data, onChange }) {
         )}
 
         <div className="mt-4 space-y-4">
-          {selectedModelKeys.length === 0 ? (
+          {selectedModels.size === 0 ? (
             // ยังไม่ได้เลือกรุ่นเครื่องใน Step 2 เลย — ไม่ต้องโชว์ฟอร์มกรอกผู้ใช้
             // ให้เตือนไปกรอกข้อมูลรุ่นเครื่องก่อนแทน
             <div className="flex items-center gap-2.5 rounded-xl border border-dashed border-amber-tint bg-amber-tint px-4 py-4 text-[13.5px] text-amber">
@@ -175,7 +163,7 @@ export default function Step3Users({ data, onChange }) {
               const groupReachedLimit = group.users.length >= USER_LIMIT;
 
               return (
-                <div key={group.key} className="user-group-panel overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_2px_8px_rgba(22,35,61,0.035)]">
+                <div key={group.key} className="user-group-panel rounded-xl border border-slate-200 bg-white shadow-[0_2px_8px_rgba(22,35,61,0.035)]">
                   <button
                     type="button"
                     onClick={() => toggleGroup(group.key)}
@@ -217,17 +205,15 @@ export default function Step3Users({ data, onChange }) {
                               />
                             </div>
                             <div>
-                              <label className="mb-1 block text-[12px] font-semibold text-ink-soft">
-                                {t("UserType")}
-                              </label>
-                              <select
-                                className="h-10 w-full rounded-xl border border-line-strong bg-white px-3 text-sm text-ink shadow-sm outline-none transition hover:border-brand/50 focus:border-brand focus:ring-4 focus:ring-brand-tint"
+                              <SearchableSelect
+                                label={t("UserType")}
                                 value={u.user_type}
-                                onChange={(e) => setUserField(u.index, "user_type", e.target.value)}
-                              >
-                                <option value="normal">User</option>
-                                <option value="super">Super user</option>
-                              </select>
+                                options={[
+                                  { value: "normal", label: t("userTypeNormal") },
+                                  { value: "super", label: t("userTypeSuper") },
+                                ]}
+                                onChange={({ value }) => setUserField(u.index, "user_type", value)}
+                              />
                             </div>
                             <div>
                               <label className="mb-1 block text-[12px] font-semibold text-ink-soft">
