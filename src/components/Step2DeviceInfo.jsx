@@ -134,6 +134,47 @@ function normalizeHouse(h) {
   return base;
 }
 
+function copyEquipmentModels(source, target, modelKey) {
+  return source.map((item, index) => ({
+    [modelKey]: item[modelKey],
+    serial_number: target[index]?.[modelKey] === item[modelKey]
+      ? target[index]?.serial_number ?? ""
+      : "",
+  }));
+}
+
+function copyHouseSettings(source, target) {
+  const silonicModels = source.silonic_enabled ? copyEquipmentModels(source.silonic_models, target.silonic_models, "model") : [];
+  const sameSmartlink = source.model_enabled && target.model_enabled
+    && source.device_communication.smartlink && target.device_communication.smartlink
+    && source.device_models[0]?.model === target.device_models[0]?.model;
+  const copied = {
+    ...target,
+    configured: true,
+    model_enabled: source.model_enabled,
+    device_models: source.model_enabled ? copyEquipmentModels(source.device_models, target.device_models, "model") : [],
+    device_communication: { ...source.device_communication },
+    smartlink_serial_number: sameSmartlink ? target.smartlink_serial_number : "",
+    egg_enabled: source.egg_enabled,
+    egg_models: source.egg_enabled ? copyEquipmentModels(source.egg_models, target.egg_models, "model") : [],
+    egg_communication: { ...source.egg_communication },
+    alarm_enabled: source.alarm_enabled,
+    alarms: source.alarm_enabled ? copyEquipmentModels(source.alarms, target.alarms, "key") : [],
+    alarm_communication: { ...source.alarm_communication },
+    silonic_enabled: source.silonic_enabled,
+    silonic_models: silonicModels,
+    silonic_communication: { ...source.silonic_communication },
+    silonic_serial_number: silonicModels[0]?.serial_number ?? "",
+  };
+  // Legacy fields must not repopulate equipment that the copied settings removed.
+  delete copied.device_model;
+  delete copied.model_serial_number;
+  delete copied.egg_model;
+  delete copied.egg_serial_number;
+  delete copied.silonic;
+  return copied;
+}
+
 function summarizeCommunication(communication, t) {
   const labels = COMMUNICATION_OPTIONS.filter((o) => communication?.[o.key]).map((o) => t(o.labelKey));
   return labels.length ? labels.join(", ") : "";
@@ -200,8 +241,19 @@ export default function Step2DeviceInfo({ data, onChange }) {
   const [selectedAlarms, setSelectedAlarms] = useState(data.alarms || []);
   const [selectedSilonic, setSelectedSilonic] = useState([]);
   const [showHouseListInfo, setShowHouseListInfo] = useState(false);
+  const copyDialogRef = useRef(null);
+  const [copySourceIndex, setCopySourceIndex] = useState(null);
+  const [copyTargets, setCopyTargets] = useState([]);
 
   const houses = useMemo(() => (data.houses ?? []).map(normalizeHouse), [data.houses]);
+  const copySources = houses.flatMap((house, index) => (
+    (house.model_enabled && house.device_models.length)
+      || (house.alarm_enabled && house.alarms.length)
+      || (house.egg_enabled && house.egg_models.length)
+      || (house.silonic_enabled && house.silonic_models.length)
+      ? [index]
+      : []
+  ));
   const expectedHouseCount = Math.max(1, Number.parseInt(data.house_count, 10) || 1);
 
   useEffect(() => {
@@ -239,6 +291,23 @@ export default function Step2DeviceInfo({ data, onChange }) {
     const nextHouses = houses.map((h, i) => (i === editingIndex ? { ...draft, configured: true } : h));
     onChange({ ...data, houses: nextHouses });
     closeEditor();
+  }
+
+  function openCopyDialog() {
+    setCopySourceIndex(copySources[0] ?? null);
+    setCopyTargets([]);
+    copyDialogRef.current.showModal();
+  }
+
+  function applyHouseSettings() {
+    if (!copySources.includes(copySourceIndex) || copyTargets.length === 0) return;
+    const source = houses[copySourceIndex];
+    const targets = new Set(copyTargets);
+    const nextHouses = data.houses.map((house, index) => (
+      index !== copySourceIndex && targets.has(index) ? copyHouseSettings(source, houses[index]) : house
+    ));
+    onChange({ ...data, houses: nextHouses });
+    copyDialogRef.current.close();
   }
 
   function updateDraft(patch) {
@@ -462,7 +531,7 @@ export default function Step2DeviceInfo({ data, onChange }) {
       </div>
 
       <div className="form-step-body px-7 py-8 sm:px-9 sm:py-9">
-        <div className="flex items-center gap-2 border-b border-line pb-3">
+        <div className="flex flex-wrap items-center gap-2 border-b border-line pb-3">
           <p className="text-[13px] font-bold uppercase tracking-[0.06em] text-ink-soft">{t("houseList")}</p>
           <button
             type="button"
@@ -472,6 +541,16 @@ export default function Step2DeviceInfo({ data, onChange }) {
           >
             <Icon name="info-circle" style={{ fontSize: 14 }} />
           </button>
+          {houses.length > 1 && (
+            <button
+              type="button"
+              onClick={openCopyDialog}
+              className="ml-auto inline-flex items-center gap-1.5 rounded-lg border border-brand bg-white px-3 py-2 text-[12px] font-semibold text-brand-dark transition hover:bg-brand-tint"
+            >
+              <Icon name="copy" style={{ fontSize: 14 }} />
+              {t("copyHouseSettings")}
+            </button>
+          )}
         </div>
         {showHouseListInfo && (
           <div className="mt-3 flex items-start gap-2 rounded-xl border border-brand-tint bg-brand-tint px-3.5 py-2.5 text-[13px] leading-5 text-ink">
@@ -565,6 +644,67 @@ export default function Step2DeviceInfo({ data, onChange }) {
           )}
         </div>
       </div>
+
+      <dialog
+        ref={copyDialogRef}
+        aria-labelledby="copy-house-settings-title"
+        className="m-auto max-h-[85vh] w-[calc(100%-2rem)] max-w-lg rounded-xl border border-line bg-white p-5 text-ink shadow-xl backdrop:bg-ink/45 sm:p-6"
+      >
+        <h2 id="copy-house-settings-title" className="mb-4 text-lg font-bold">{t("copyHouseSettings")}</h2>
+        {copySources.length === 0 ? (
+          <p className="text-sm text-ink-soft">{t("copyHouseNoSource")}</p>
+        ) : (
+          <div className="space-y-4">
+            <label className="block text-sm font-semibold">
+              {t("copyHouseSource")}
+              <select
+                value={copySourceIndex ?? ""}
+                onChange={(event) => {
+                  const index = Number(event.target.value);
+                  setCopySourceIndex(index);
+                  setCopyTargets((targets) => targets.filter((target) => target !== index));
+                }}
+                className="mt-1.5 h-10 w-full rounded-lg border border-line-strong bg-white px-3"
+              >
+                {copySources.map((index) => <option key={index} value={index}>{houses[index].name}</option>)}
+              </select>
+            </label>
+            <fieldset>
+              <legend className="mb-2 text-sm font-semibold">{t("copyHouseTargets")}</legend>
+              <div className="max-h-52 space-y-1 overflow-y-auto rounded-lg border border-line p-1">
+                {houses.map((house, index) => index !== copySourceIndex && (
+                  <label key={index} className="flex cursor-pointer items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-mist">
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4 accent-brand"
+                      checked={copyTargets.includes(index)}
+                      onChange={(event) => {
+                        const checked = event.target.checked;
+                        setCopyTargets((targets) => checked ? [...targets, index] : targets.filter((target) => target !== index));
+                      }}
+                    />
+                    {house.name}
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+            <p className="rounded-lg bg-mist px-3 py-2.5 text-[13px] text-ink-soft">{t("copyHouseNotice")}</p>
+          </div>
+        )}
+        <div className="mt-5 flex flex-wrap justify-end gap-2">
+          <button type="button" onClick={() => copyDialogRef.current.close()} className="rounded-lg border border-line-strong px-4 py-2 text-sm font-medium hover:bg-mist">
+            {t("cancel")}
+          </button>
+          <button
+            type="button"
+            disabled={!copySources.includes(copySourceIndex) || copyTargets.length === 0}
+            onClick={applyHouseSettings}
+            className="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {t("copyHouseApply")}
+          </button>
+        </div>
+      </dialog>
 
       {editingIndex !== null && draft &&
         createPortal(
