@@ -631,20 +631,6 @@ export default function Landing() {
           from { opacity: 0; transform: translateY(12px); }
           to { opacity: 1; transform: translateY(0); }
         }
-        .auth-column-open {
-          align-items: stretch;
-          min-height: 0;
-          height: 100%;
-          overflow: hidden;
-        }
-        .auth-column-open > div {
-          display: flex;
-          align-items: stretch;
-          width: 100%;
-          min-height: 0;
-          height: 100%;
-          overflow: hidden;
-        }
         .language-dropdown {
           width: 132px;
         }
@@ -684,63 +670,16 @@ export default function Landing() {
         .auth-surface {
           --auth-gap: 18px;
           --auth-radius: 12px;
-          position: relative;
           width: 100%;
-          height: 100%;
-          max-height: 100%;
-          min-height: 0;
           display: flex;
           flex-direction: column;
-          overflow-y: hidden;
-          overflow-x: hidden;
-          overscroll-behavior: contain;
-          scrollbar-gutter: stable;
-          padding: 0 2px;
-          background: transparent;
-          border: 0;
-          border-radius: 0;
-          box-shadow: none;
         }
-        .auth-surface > :first-child {
-          width: 100%;
+        .auth-surface.auth-surface-verify {
           max-width: 500px;
           margin: 0 auto;
-          flex: 0 0 auto;
         }
-        /* Keep Sign In and Access Key visually aligned as the same compact auth layout. */
-        /* Sign In: center the complete form group at the same visual level as Access Key. */
-        .auth-surface.auth-surface-signin {
-          justify-content: center;
-          padding-top: 0;
-          padding-bottom: 0;
-        }
-        /* Access Key: center the complete verification block in the left panel. */
-        .auth-surface.auth-surface-verify {
-          display: grid;
-          grid-template-columns: minmax(0, 1fr);
-          align-content: center;
-          justify-items: center;
-          row-gap: 0;
-          padding-top: 0;
-          padding-bottom: 0;
-        }
-        .auth-surface.auth-surface-verify > * {
-          width: 100%;
-          max-width: 500px;
-          margin-left: auto;
-          margin-right: auto;
-        }
-        /* Signup has the most fields of any page. Its --auth-gap is tighter so the same
-           spacing rules used everywhere else still read as one coherent rhythm, and
-           overflow falls back to an internal scroll (instead of clipping) if a
-           longer translation ever pushes it past the viewport. */
         .auth-surface.auth-surface-signup {
           --auth-gap: 14px;
-          justify-content: flex-start;
-          overflow-y: auto;
-          overflow-x: hidden;
-          padding-top: 32px;
-          padding-bottom: var(--auth-gap);
         }
         .auth-surface.auth-surface-signup .auth-footer-hint {
           display: none;
@@ -897,27 +836,11 @@ export default function Landing() {
           font-size: 16px;
           outline: none;
         }
-        /* Top nav row: icon-only back arrow (left, goes to the previous step)
-           and icon-only close (right, always exits to the first/role-select
-           page) — shared across Sign In, Access Key, and Sign Up.
-           Inset + vertical gap are tuned to match the icon block below it. */
         .auth-surface > .auth-nav-row {
           display: flex;
           align-items: center;
           justify-content: space-between;
           margin-bottom: 24px;
-          padding: 0;
-          /* Buttons should reach the real edges of the panel, not the
-             narrower 500px reading-width used for the form fields below.
-             We now simply let the row fill 100% of auth-surface's own box
-             (whose own side padding was shrunk to 2px above) instead of
-             using negative margins to "escape" a bigger padding — that
-             earlier approach pushed the row past auth-surface's own edge,
-             and since auth-surface has overflow:hidden, part of the arrow
-             icon got silently clipped down to a stray "-". This way there
-             is nothing to clip. */
-          max-width: none;
-          position: relative;
         }
         .auth-icon-button {
           display: flex;
@@ -940,14 +863,6 @@ export default function Landing() {
           box-shadow: 0 0 0 3px rgba(100, 116, 139, 0.14);
         }
         @media (max-width: 1279px) {
-          /* Every screen (role-select, sign in, sign up, access key) on
-             phone/tablet: pin the whole page to the real viewport height so
-             it centers vertically instead of growing taller than the screen
-             and getting cut off. If content is ever too tall for a very
-             short device, it scrolls internally rather than hiding behind
-             the browser UI. The language switcher stays "absolute" on the
-             outer wrapper, so it is unaffected and stays pinned to the
-             top-right corner. */
           .home-viewport-fit {
             height: 100dvh;
             min-height: 100dvh;
@@ -955,59 +870,6 @@ export default function Landing() {
           }
         }
         @media (max-width: 1279px) {
-          .auth-column-open {
-            width: 100%;
-            min-height: auto;
-            height: auto;
-            overflow: visible;
-            align-items: center;
-            justify-content: center;
-            padding: 18px 16px 32px;
-          }
-
-          .auth-column-open > div {
-            align-items: stretch;
-            justify-content: center;
-            width: 100%;
-            height: auto;
-            overflow: visible;
-          }
-
-          .auth-page-enter,
-          .auth-page-exit {
-            width: 100%;
-            max-width: 390px;
-            margin: 0 auto;
-          }
-
-          .auth-surface {
-            width: 100%;
-            height: auto;
-            max-height: none;
-            min-height: 0;
-            overflow: visible;
-            padding: 0;
-            display: block;
-            margin: 0 auto;
-          }
-
-          .auth-surface.auth-surface-signin,
-          .auth-surface.auth-surface-verify {
-            padding-top: 0;
-            padding-bottom: 24px;
-          }
-
-          /* Sit just below the language switcher (which ends ~60px from the
-             top) instead of overlapping it, while still reaching the full
-             left/right edges — auth-surface is overflow:visible on mobile
-             (see below) so, unlike desktop, there's no clipping risk here. */
-          .auth-surface > .auth-nav-row {
-            z-index: 40;
-            top: 44px;
-            margin-bottom: 68px;
-            padding: 0;
-          }
-
           .language-dropdown {
             width: 124px;
             z-index: 50;
@@ -1023,22 +885,10 @@ export default function Landing() {
         }
 
         @media (min-width: 768px) and (max-width: 1279px) {
-          .auth-surface { padding-left: 4px; padding-right: 4px; }
-          .auth-surface > .auth-nav-row { max-width: none; }
           .auth-context { gap: 12px; }
           .auth-context-icon { height: 42px; width: 42px; flex-basis: 42px; }
           .auth-helper { font-size: 13px; }
           .role-card { min-height: 100px; padding-left: 16px; padding-right: 16px; }
-          /* Tablets have real width to spare — the 390px phone-sized card
-             cap (above) made the form float tiny in a sea of white space on
-             an iPad. Let the card grow to use the space instead. */
-          .auth-page-enter,
-          .auth-page-exit {
-            max-width: 640px;
-          }
-          .auth-surface > :first-child {
-            max-width: 560px;
-          }
         }
         @media (prefers-reduced-motion: reduce) {
           .auth-page-enter, .auth-page-exit, .auth-page-enter .auth-stagger-1,
@@ -1049,11 +899,15 @@ export default function Landing() {
           .auth-surface { animation: none !important; }
         }
       `}</style>
-      <div className="relative min-h-screen w-full overflow-x-hidden bg-white xl:h-screen xl:overflow-hidden home-viewport-fit">
+      <div className={`relative w-full overflow-x-hidden bg-white ${isLoginOpen ? "" : "min-h-screen xl:h-screen xl:overflow-hidden home-viewport-fit"}`}>
         {languageSwitcher}
-        <div className="flex h-full flex-col justify-center overflow-visible xl:h-screen xl:min-h-0 xl:flex-row xl:justify-start xl:overflow-hidden">
-          <div className={`flex h-full min-h-0 w-full items-center justify-center overflow-hidden px-5 py-8 xl:w-1/3 xl:px-4 ${isLoginOpen ? "auth-column-open" : ""}`}>
-            <div className="flex h-full min-h-0 w-full max-w-[620px] flex-col justify-center">
+        <div className={isLoginOpen
+          ? "flex min-h-dvh items-center justify-center px-5 py-[72px]"
+          : "flex h-full flex-col justify-center overflow-visible xl:h-screen xl:min-h-0 xl:flex-row xl:justify-start xl:overflow-hidden"}>
+          <div className={isLoginOpen
+            ? "w-full max-w-[390px] md:max-w-[620px]"
+            : "flex h-full min-h-0 w-full items-center justify-center overflow-hidden px-5 py-8 xl:w-1/3 xl:px-4"}>
+            <div className={isLoginOpen ? "w-full" : "flex h-full min-h-0 w-full max-w-[620px] flex-col justify-center"}>
               {!isLoginOpen ? (
                 <div key={homeAnimationKey} className="home-page-enter">
                   <div className="mb-4 flex w-full justify-center home-logo-enter">
@@ -1076,8 +930,8 @@ export default function Landing() {
                   </div>
                 </div>
               ) : (
-                <div key={authPageKey} className={`min-h-0 flex-1 ${isAuthExiting ? "auth-page-exit" : "auth-page-enter"}`}>
-                  <div className={`auth-surface ${authMode === "Sign In" ? "auth-surface-signin" : ""} ${authMode === "Sign Up" ? "auth-surface-signup" : ""} ${authMode === "Sign Up" && signupStep === "verify" ? "auth-surface-verify" : ""}`}>
+                <div key={authPageKey} className={isAuthExiting ? "auth-page-exit" : "auth-page-enter"}>
+                  <div className={`auth-surface ${authMode === "Sign Up" ? "auth-surface-signup" : ""} ${authMode === "Sign Up" && signupStep === "verify" ? "auth-surface-verify" : ""}`}>
                     <>
                       <div className="auth-nav-row auth-stagger-1">
                         <button
@@ -1385,7 +1239,9 @@ export default function Landing() {
               )}
             </div>
           </div>
-          <div className="hidden min-h-0 overflow-hidden xl:block xl:h-full xl:w-2/3">{brandPanel}</div>
+          {!isLoginOpen && (
+            <div className="hidden min-h-0 overflow-hidden xl:block xl:h-full xl:w-2/3">{brandPanel}</div>
+          )}
         </div>
       </div>
     </>
