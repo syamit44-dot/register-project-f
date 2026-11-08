@@ -228,16 +228,16 @@ function ModelImagePreview({ image, svgHtml, name }) {
   );
 }
 
-export default function Step2DeviceInfo({ active, data, onChange }) {
+export default function Step2DeviceInfo({ active, data, onChange, editor, onEditorChange }) {
   const { t } = useLanguage();
-  const [editingIndex, setEditingIndex] = useState(null);
-  const [draft, setDraft] = useState(null);
-  const [selectedModel, setSelectedModel] = useState(data.device_model || "");
-  const [selectedEggModels, setSelectedEggModels] = useState(data.egg_models || []);
-  const [selectedAlarms, setSelectedAlarms] = useState(data.alarms || []);
-  const [selectedSilonic, setSelectedSilonic] = useState([]);
+  const editingIndex = editor?.index ?? null;
+  const draft = editor?.draft ?? null;
+  const selectedModel = draft?.device_models?.[0]?.model || "";
+  const selectedEggModels = draft?.egg_models ?? [];
+  const selectedAlarms = draft?.alarms ?? [];
+  const selectedSilonic = draft?.silonic_models ?? [];
+  const copyTargets = editor?.targets ?? [];
   const [showHouseListInfo, setShowHouseListInfo] = useState(false);
-  const [copyTargets, setCopyTargets] = useState([]);
   const [equipmentModels, setEquipmentModels] = useState([]);
   const [catalogState, setCatalogState] = useState("loading");
 
@@ -282,19 +282,16 @@ export default function Step2DeviceInfo({ active, data, onChange }) {
   }, [data, expectedHouseCount, onChange]);
 
   function openEditor(index) {
-    const normalized = index === null ? emptyHouseDetail() : houses[index];
-    setDraft(normalized);
-    setSelectedModel(normalized.device_models?.[0]?.model || "");
-    setSelectedAlarms(normalized.alarms || []);
-    setSelectedEggModels(normalized.egg_models || []);
-    setEditingIndex(index);
-    setSelectedSilonic(normalized.silonic_models || []);
-    setCopyTargets([]);
+    onEditorChange({
+      type: "equipment",
+      index,
+      draft: index === null ? emptyHouseDetail() : houses[index],
+      targets: [],
+    });
   }
 
   function closeEditor() {
-    setEditingIndex(null);
-    setDraft(null);
+    onEditorChange(null);
   }
 
   function saveEditor() {
@@ -311,6 +308,10 @@ export default function Step2DeviceInfo({ active, data, onChange }) {
     setDraft((prev) => ({ ...prev, ...patch }));
   }
 
+  function setDraft(update) {
+    onEditorChange((previous) => ({ ...previous, draft: update(previous.draft), dirty: true }));
+  }
+
   function selectDraftCommunication(section, key) {
     setDraft((prev) => {
       const isActive = prev[section][key];
@@ -320,106 +321,24 @@ export default function Step2DeviceInfo({ active, data, onChange }) {
     });
   }
 
-  function selectedEquipment(option, key, previous) {
-    return option.value ? [{
-      [key]: option.value,
-      model_id: option.id,
-      model_name: option.label,
-      serial_number: previous?.serial_number ?? "",
-    }] : [];
-  }
-
-  function handleDeviceModelSelect(option) {
-    setSelectedModel(option.value);
+  function selectEquipment(field, key, option) {
     setDraft((prev) => ({
       ...prev,
-      device_models: selectedEquipment(option, "model", prev.device_models?.[0]),
+      [field]: option.value ? [{
+        [key]: option.value,
+        model_id: option.id,
+        model_name: option.label,
+        serial_number: prev[field][0]?.serial_number ?? "",
+      }] : [],
     }));
   }
 
-  function handleDeviceSerialChange(value) {
+  function changeEquipmentSerial(field, value) {
     setDraft((prev) => ({
       ...prev,
-      device_models: prev.device_models?.[0]
-        ? [{ ...prev.device_models[0], serial_number: value }]
-        : selectedModel
-          ? [{ model: selectedModel, serial_number: value }]
-          : [],
+      [field]: [{ ...prev[field][0], serial_number: value }, ...prev[field].slice(1)],
+      ...(field === "silonic_models" ? { silonic_serial_number: value } : {}),
     }));
-  }
-
-  function handleEggModelSelect(option) {
-    setDraft((prev) => {
-      const nextEggModels = selectedEquipment(option, "model", prev.egg_models?.[0]);
-      setSelectedEggModels(nextEggModels);
-      return { ...prev, egg_models: nextEggModels };
-    });
-  }
-
-  function handleEggSerialChange(value) {
-    setDraft((prev) => {
-      const currentModel = prev.egg_models?.[0]?.model || selectedEggModels[0]?.model || "";
-      const nextEggModels = currentModel ? [{ ...prev.egg_models?.[0], model: currentModel, serial_number: value }] : [];
-      setSelectedEggModels(nextEggModels);
-      return { ...prev, egg_models: nextEggModels };
-    });
-  }
-
-  function handleAlarmSelect(option) {
-    setDraft((prev) => {
-      const nextAlarms = selectedEquipment(option, "key", prev.alarms?.[0]);
-      setSelectedAlarms(nextAlarms);
-      return { ...prev, alarms: nextAlarms };
-    });
-  }
-
-  function handleAlarmSerialChange(value) {
-    setDraft((prev) => {
-      const currentKey = prev.alarms?.[0]?.key || selectedAlarms[0]?.key || "";
-      const nextAlarms = currentKey ? [{ ...prev.alarms?.[0], key: currentKey, serial_number: value }] : [];
-      setSelectedAlarms(nextAlarms);
-      return { ...prev, alarms: nextAlarms };
-    });
-  }
-
-  function handleSilonicSelect(option) {
-    setDraft((prev) => {
-      const nextSilonic = selectedEquipment(option, "model", prev.silonic_models?.[0]);
-
-      setSelectedSilonic(nextSilonic);
-
-      return {
-        ...prev,
-        silonic_models: nextSilonic,
-      };
-    });
-  }
-
-  function handleSilonicSerialChange(value) {
-    setDraft((prev) => {
-      const currentKey =
-        prev.silonic_models?.[0]?.model ||
-        selectedSilonic[0]?.model ||
-        "";
-
-      const nextSilonic = currentKey
-        ? [
-            {
-              ...prev.silonic_models?.[0],
-              model: currentKey,
-              serial_number: value,
-            },
-          ]
-        : [];
-
-      setSelectedSilonic(nextSilonic);
-
-      return {
-        ...prev,
-        silonic_models: nextSilonic,
-        silonic_serial_number: value,
-      };
-    });
   }
 
   function renderModelSelect(category, value, valueLabel, onChange) {
@@ -688,7 +607,13 @@ export default function Step2DeviceInfo({ active, data, onChange }) {
                             checked={copyTargets.includes(index)}
                             onChange={(event) => {
                               const checked = event.target.checked;
-                              setCopyTargets((targets) => checked ? [...targets, index] : targets.filter((target) => target !== index));
+                              onEditorChange((previous) => ({
+                                ...previous,
+                                dirty: true,
+                                targets: checked
+                                  ? [...previous.targets, index]
+                                  : previous.targets.filter((target) => target !== index),
+                              }));
                             }}
                           />
                           {house.name}
@@ -715,7 +640,7 @@ export default function Step2DeviceInfo({ active, data, onChange }) {
                       <div className="flex-1">
                         <div className="flex gap-3">
                           <div className="flex-1">
-                            {renderModelSelect("CONTROLLER", selectedModel, draft.device_models[0]?.model_name ?? modelData[selectedModel]?.name ?? selectedModel, handleDeviceModelSelect)}
+                            {renderModelSelect("CONTROLLER", selectedModel, draft.device_models[0]?.model_name ?? modelData[selectedModel]?.name ?? selectedModel, (option) => selectEquipment("device_models", "model", option))}
                           </div>
                           {!isBulkEditing && (
                             <div className="flex-1">
@@ -727,7 +652,7 @@ export default function Step2DeviceInfo({ active, data, onChange }) {
                                   placeholder={t("enterSerialNumber")}
                                   disabled={!selectedModel}
                                   value={draft.device_models?.[0]?.serial_number ?? ""}
-                                  onChange={(e) => handleDeviceSerialChange(e.target.value)}
+                                  onChange={(e) => changeEquipmentSerial("device_models", e.target.value)}
                                 />
                               </label>
                             </div>
@@ -759,7 +684,7 @@ export default function Step2DeviceInfo({ active, data, onChange }) {
                       <div className="flex-1">
                         <div className="flex gap-3">
                           <div className="flex-1">
-                            {renderModelSelect("ALARM", selectedAlarms[0]?.key || "", selectedAlarms[0]?.model_name ?? summarizeAlarms(selectedAlarms), handleAlarmSelect)}
+                            {renderModelSelect("ALARM", selectedAlarms[0]?.key || "", selectedAlarms[0]?.model_name ?? summarizeAlarms(selectedAlarms), (option) => selectEquipment("alarms", "key", option))}
                           </div>
                           {!isBulkEditing && (
                             <div className="flex-1">
@@ -771,7 +696,7 @@ export default function Step2DeviceInfo({ active, data, onChange }) {
                                   placeholder={t("enterSerialNumber")}
                                   disabled={!selectedAlarms[0]?.key}
                                   value={draft.alarms?.[0]?.serial_number ?? ""}
-                                  onChange={(e) => handleAlarmSerialChange(e.target.value)}
+                                  onChange={(e) => changeEquipmentSerial("alarms", e.target.value)}
                                 />
                               </label>
                             </div>
@@ -803,7 +728,7 @@ export default function Step2DeviceInfo({ active, data, onChange }) {
                       <div className="flex-1">
                         <div className="flex gap-3">
                           <div className="flex-1">
-                            {renderModelSelect("SILONIC", selectedSilonic[0]?.model || "", selectedSilonic[0]?.model_name ?? selectedSilonic[0]?.model, handleSilonicSelect)}
+                            {renderModelSelect("SILONIC", selectedSilonic[0]?.model || "", selectedSilonic[0]?.model_name ?? selectedSilonic[0]?.model, (option) => selectEquipment("silonic_models", "model", option))}
                           </div>
                           {!isBulkEditing && (
                             <div className="flex-1">
@@ -815,7 +740,7 @@ export default function Step2DeviceInfo({ active, data, onChange }) {
                                   placeholder={t("enterSerialNumber")}
                                   disabled={!selectedSilonic[0]?.model}
                                   value={draft.silonic_models?.[0]?.serial_number ?? ""}
-                                  onChange={(e) => handleSilonicSerialChange(e.target.value)}
+                                  onChange={(e) => changeEquipmentSerial("silonic_models", e.target.value)}
                                 />
                               </label>
                             </div>
@@ -847,7 +772,7 @@ export default function Step2DeviceInfo({ active, data, onChange }) {
                       <div className="flex-1">
                         <div className="flex gap-3">
                           <div className="flex-1">
-                            {renderModelSelect("EGG", selectedEggModels[0]?.model || "", selectedEggModels[0]?.model_name ?? selectedEggModels[0]?.model, handleEggModelSelect)}
+                            {renderModelSelect("EGG", selectedEggModels[0]?.model || "", selectedEggModels[0]?.model_name ?? selectedEggModels[0]?.model, (option) => selectEquipment("egg_models", "model", option))}
                           </div>
                           {!isBulkEditing && (
                             <div className="flex-1">
@@ -859,7 +784,7 @@ export default function Step2DeviceInfo({ active, data, onChange }) {
                                   placeholder={t("enterSerialNumber")}
                                   disabled={!selectedEggModels[0]?.model}
                                   value={draft.egg_models?.[0]?.serial_number ?? ""}
-                                  onChange={(e) => handleEggSerialChange(e.target.value)}
+                                  onChange={(e) => changeEquipmentSerial("egg_models", e.target.value)}
                                 />
                               </label>
                             </div>

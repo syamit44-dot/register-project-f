@@ -1,4 +1,4 @@
-import { HashRouter, Routes, Route } from "react-router-dom";
+import { createHashRouter, Outlet, RouterProvider } from "react-router-dom";
 import IconSprite from "./components/IconSprite";
 import Landing from "./pages/Landing";
 import CustomerForm from "./pages/CustomerForm";
@@ -8,19 +8,20 @@ import AccountPage from "./pages/AccountPage";
 import HouseDetail from "./pages/HouseDetail";
 import FarmDetail from "./pages/FarmDetail";
 
+const router = createHashRouter([{
+  element: <><IconSprite /><Outlet /></>,
+  children: [
+    { path: "/", element: <Landing /> },
+    { path: "/customer", element: <CustomerForm /> },
+    { path: "/admin", element: <AdminPage /> },
+    { path: "/home", element: <Home /> },
+    { path: "/home/house/:index", element: <HouseDetail /> },
+    { path: "/home/farm", element: <FarmDetail /> },
+    { path: "/account", element: <AccountPage /> },
+    { path: "*", element: null },
+  ],
+}]);
+
 export default function App() {
-  return (
-    <HashRouter>
-      <IconSprite />
-      <Routes>
-        <Route path="/" element={<Landing />} />
-        <Route path="/customer" element={<CustomerForm />} />
-        <Route path="/admin" element={<AdminPage />} />
-        <Route path="/home" element={<Home />} />
-        <Route path="/home/house/:index" element={<HouseDetail />} />
-        <Route path="/home/farm" element={<FarmDetail />} />
-        <Route path="/account" element={<AccountPage />} />
-      </Routes>
-    </HashRouter>
-  );
+  return <RouterProvider router={router} />;
 }

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import Icon from "./Icon";
 import SearchableSelect from "./SearchableSelect";
 import countryData from "../data/countryData";
-import DealerContactModal from "./DealerContactModal";
+import DealerContactModal, { dealerContactDraft } from "./DealerContactModal";
 import { useLanguage } from "../i18n.jsx";
 
 const HOUSE_COUNT_OPTIONS = Array.from({ length: 90 }, (_, i) => ({ value: i + 1, label: String(i + 1) }));
@@ -36,7 +36,7 @@ function SectionHeading({ icon, title }) {
   );
 }
 
-export default function Step1CustomerInfo({ data, onChange }) {
+export default function Step1CustomerInfo({ data, onChange, editor, onEditorChange }) {
   const { t } = useLanguage();
   const set = (key) => (e) => onChange({ ...data, [key]: e.target.value });
 
@@ -45,7 +45,6 @@ export default function Step1CustomerInfo({ data, onChange }) {
   const [timezoneQuery, setTimezoneQuery] = useState(data.timezone || "");
   const [isTimezoneOpen, setIsTimezoneOpen] = useState(false);
   const [timezoneOptions, setTimezoneOptions] = useState([]);
-  const [showDealerModal, setShowDealerModal] = useState(false);
 
   useEffect(() => {
     setCountryQuery(data.country || "");
@@ -315,7 +314,7 @@ export default function Step1CustomerInfo({ data, onChange }) {
               <div className="mt-1.5 flex-1">
                 <button
                   type="button"
-                  onClick={() => setShowDealerModal(true)}
+                  onClick={() => onEditorChange({ type: "dealer", draft: dealerContactDraft(data) })}
                   className={`flex h-full min-h-11 w-full flex-row items-center justify-center gap-2 whitespace-nowrap rounded-xl border px-2 text-[15px] font-semibold leading-none transition ${
                     hasDealerContact
                       ? "border-good bg-good-tint text-good"
@@ -333,13 +332,18 @@ export default function Step1CustomerInfo({ data, onChange }) {
         </div>
       </div>
 
-      <DealerContactModal
-        open={showDealerModal}
-        data={data}
-        onChange={onChange}
-        onClose={() => setShowDealerModal(false)}
-        dialPrefix={currentDialPrefix}
-      />
+      {editor && (
+        <DealerContactModal
+          draft={editor.draft}
+          onDraftChange={(draft) => onEditorChange({ ...editor, draft, dirty: true })}
+          onSave={(draft) => {
+            onChange({ ...data, ...draft });
+            onEditorChange(null);
+          }}
+          onClose={() => onEditorChange(null)}
+          dialPrefix={currentDialPrefix}
+        />
+      )}
     </>
   );
 }

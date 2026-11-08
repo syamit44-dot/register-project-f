@@ -41,9 +41,11 @@ function requestNewAccessToken() {
         return newToken;
       })
       .catch((err) => {
-        // refresh token หมดอายุ/ไม่ถูกต้อง — เคลียร์ auth แล้วแจ้งให้ UI พาไปหน้า sign in
-        clearAuth();
-        window.dispatchEvent(new Event("auth:expired"));
+        // A failed connection does not invalidate the signed-in account.
+        if (err.response?.status === 401) {
+          clearAuth();
+          window.dispatchEvent(new Event("auth:expired"));
+        }
         throw err;
       })
       .finally(() => {
@@ -95,9 +97,9 @@ api.interceptors.response.use(
 
 /* ---------- ฟอร์มลูกค้า ---------- */
 
-// ส่งข้อมูลลงทะเบียนใหม่ (ทุก step รวมกัน) ไปที่ POST /api/registrations/
+// Submit the registration payload to the Django farm request endpoint.
 export function createRegistration(payload) {
-  return api.post("/registrations/", payload).then((res) => res.data);
+  return api.post("/request/new", payload).then((res) => res.data);
 }
 
 /* ---------- หน้า Admin ---------- */
@@ -178,8 +180,8 @@ function toFarmSummary({ farm, device, alarm, egg, silonic, userapp }, modelName
   return {
     id: farm.id,
     icon_id: farm.icon_id,
-    farm_name: farm.companyName || farm.nameFarm,
-    farm_short: farm.nameFarm,
+    farm_name: farm.nameFarm,
+    farm_short: farm.companyName,
     house_count: Number(farm.numbOfHouse),
     status: FARM_STATUSES[farm.status] ?? "pending",
     platform: platforms.size > 1 ? "SmartLink / TempView" : platforms.values().next().value,
@@ -195,6 +197,7 @@ function toFarmSummary({ farm, device, alarm, egg, silonic, userapp }, modelName
     contact_phone: farm.mobile,
     contact_email: farm.emailFarm,
     note: farm.note,
+    pdpa_consent: farm.pdpa_consent,
     created_at: farm.date_created,
     updated_at: farm.date_edit,
     houses: [...houses.values()].sort((a, b) => Number(a.id) - Number(b.id)),

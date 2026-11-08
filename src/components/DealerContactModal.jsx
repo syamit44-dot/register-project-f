@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Icon from "./Icon";
 import { useLanguage } from "../i18n.jsx";
 
@@ -26,29 +26,18 @@ const EMPTY_DRAFT = {
   dealer_contact_other_value: "",
 };
 
+export function dealerContactDraft(data) {
+  return Object.fromEntries(Object.keys(EMPTY_DRAFT).map((key) => [key, data[key] ?? ""]));
+}
+
 // ป๊อปอัพกรอกช่องทางติดต่อ dealer — เปิดจากปุ่มใน Step1CustomerInfo
 // กฎ: ต้องกรอกอย่างน้อย 1 ใน 4 ช่องทาง (phone / line / email / other) ถึงจะบันทึกได้
 // Phone ใช้ format ต่อ dial prefix ท้ายแบบเดียวกับช่อง contact_phone หลัก (ผ่าน props.dialPrefix)
-export default function DealerContactModal({ open, data, onChange, onClose, dialPrefix }) {
+export default function DealerContactModal({ draft, onDraftChange, onSave, onClose, dialPrefix }) {
   const { t } = useLanguage();
-  const [draft, setDraft] = useState(EMPTY_DRAFT);
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    if (!open) return;
-    setDraft({
-      dealer_contact_phone: data.dealer_contact_phone ?? "",
-      dealer_contact_line: data.dealer_contact_line ?? "",
-      dealer_contact_email: data.dealer_contact_email ?? "",
-      dealer_contact_other_label: data.dealer_contact_other_label ?? "",
-      dealer_contact_other_value: data.dealer_contact_other_value ?? "",
-    });
-    setError("");
-  }, [open, data]);
-
-  if (!open) return null;
-
-  const set = (key) => (e) => setDraft((prev) => ({ ...prev, [key]: e.target.value }));
+  const set = (key) => (event) => onDraftChange({ ...draft, [key]: event.target.value });
 
   const localDraftPhone =
     dialPrefix && draft.dealer_contact_phone.startsWith(dialPrefix)
@@ -58,7 +47,7 @@ export default function DealerContactModal({ open, data, onChange, onClose, dial
   const handlePhoneChange = (e) => {
     const raw = e.target.value;
     const combined = dialPrefix ? `${dialPrefix} ${raw}`.trim() : raw;
-    setDraft((prev) => ({ ...prev, dealer_contact_phone: combined }));
+    onDraftChange({ ...draft, dealer_contact_phone: combined });
   };
 
   const hasAnyChannel = Boolean(
@@ -73,8 +62,7 @@ export default function DealerContactModal({ open, data, onChange, onClose, dial
       setError(t("dealerContactRequiredError"));
       return;
     }
-    onChange({ ...data, ...draft });
-    onClose();
+    onSave(draft);
   };
 
   return (

@@ -2,7 +2,7 @@ import { useEffect, useId, useState } from "react";
 import Icon from "./Icon";
 import { useLanguage } from "../i18n.jsx";
 
-export default function SearchableSelect({ label, required, value, options, onChange, placeholder, disabled, valueLabel }) {
+export default function SearchableSelect({ label, required, value, options, onChange, placeholder, disabled, valueLabel, compact = false }) {
   const { t } = useLanguage();
   const inputId = useId();
   const listId = `${inputId}-list`;
@@ -52,8 +52,8 @@ export default function SearchableSelect({ label, required, value, options, onCh
   return (
     <div className="min-w-0">
       {label && (
-        <label htmlFor={inputId} className="mb-1.5 block">
-          <span className="text-[13px] font-semibold text-ink">
+        <label htmlFor={inputId} className={compact ? "mb-1 block text-[12px] font-semibold text-ink-soft" : "mb-1.5 block"}>
+          <span className={compact ? undefined : "text-[13px] font-semibold text-ink"}>
             {label}{required && <span className="ml-0.5 text-alert">*</span>}
           </span>
         </label>
@@ -94,7 +94,9 @@ export default function SearchableSelect({ label, required, value, options, onCh
             setHighlight(-1);
             setOpen(true);
           }}
-          className="h-11 w-full rounded-xl border border-line-strong bg-white py-2 pl-3.5 pr-9 text-[13.5px] text-ink shadow-sm outline-none transition hover:border-brand/50 focus:border-brand focus:ring-4 focus:ring-brand-tint disabled:bg-mist disabled:text-ink-soft"
+          className={`w-full rounded-xl border border-line-strong bg-white py-2 pr-9 text-ink shadow-sm outline-none transition hover:border-brand/50 focus:border-brand focus:ring-4 focus:ring-brand-tint disabled:bg-mist disabled:text-ink-soft ${
+            compact ? "h-10 pl-3 text-sm" : "h-11 pl-3.5 text-[13.5px]"
+          }`}
         />
         <Icon name="chevron-down" className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-ink-soft" style={{ fontSize: 14 }} />
         {open && (

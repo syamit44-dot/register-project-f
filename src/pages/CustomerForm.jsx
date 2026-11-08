@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useBlocker, useLocation, useNavigate } from "react-router-dom";
 import { AppShellStyles, SidebarNav, SignOutModal } from "../components/AppShell";
-import { clearAuth } from "../api/auth";
+import { clearAuth, getAuth } from "../api/auth";
 import StepRail from "../components/StepRail";
 import Step1CustomerInfo from "../components/Step1CustomerInfo";
 import Step2DeviceInfo from "../components/Step2DeviceInfo";
@@ -10,6 +10,7 @@ import Step4Confirm from "../components/Step4Confirm";
 import Icon from "../components/Icon";
 import { createRegistration } from "../api/client";
 import { useLanguage } from "../i18n.jsx";
+import { registrationErrorMessage, registrationPayload } from "../utils/registrationPayload";
 
 const initialData = {
   farm_name: "",
@@ -36,10 +37,69 @@ const initialData = {
   platform: "",
   device_model: "",
   houses: [{ name: "House 1", serial_number: "" }],
-  app_users: [{ username: "default1234", user_type: "normal" }],
+  app_users: [],
   note: "",
   pdpa_consent: false,
 };
+const emptyDraftData = JSON.stringify(initialData);
+
+function draftStorageScope() {
+  const auth = getAuth();
+  const account = auth?.token && (auth.email || auth.username);
+  return {
+    storage: account ? "localStorage" : "sessionStorage",
+    key: `farm-registration-draft:v1:${account ? encodeURIComponent(account) : "guest"}`,
+  };
+}
+
+function readDraft({ storage, key }) {
+  try {
+    const draft = JSON.parse(window[storage].getItem(key));
+    if (Array.isArray(draft?.data?.houses) && Array.isArray(draft.data.app_users)) {
+      return draft;
+    }
+  } catch {
+    // A corrupt or unavailable draft should not prevent opening the form.
+  }
+  return null;
+}
+
+function LeaveDraftDialog({ blocker, draftSaved }) {
+  const { t } = useLanguage();
+  const dialogRef = useRef(null);
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    dialog.showModal();
+    return () => dialog.close();
+  }, []);
+
+  return (
+    <dialog
+      ref={dialogRef}
+      aria-labelledby="leave-draft-title"
+      aria-describedby="leave-draft-message"
+      onCancel={(event) => {
+        event.preventDefault();
+        blocker.reset();
+      }}
+      className="m-auto w-[calc(100%-2rem)] max-w-md rounded-xl border border-line bg-white p-6 text-ink shadow-xl backdrop:bg-ink/45"
+    >
+      <h2 id="leave-draft-title" className="text-lg font-bold">{t("leaveRegistrationTitle")}</h2>
+      <p id="leave-draft-message" className="mt-2 text-sm text-ink-soft">
+        {t(draftSaved ? "leaveRegistrationSaved" : "registrationDraftUnavailable")}
+      </p>
+      <div className="mt-5 flex flex-wrap justify-end gap-2">
+        <button type="button" onClick={() => blocker.reset()} className="rounded-lg border border-line-strong px-4 py-2 text-sm font-semibold">
+          {t("stayOnRegistration")}
+        </button>
+        <button type="button" onClick={() => blocker.proceed()} className="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white">
+          {t("leaveRegistration")}
+        </button>
+      </div>
+    </dialog>
+  );
+}
 
 // แถบปุ่มท้ายแต่ละสเต็ป — รวมไว้ที่เดียวแทนที่จะก็อปปี้ 4 รอบ เพื่อให้หน้าตา/สเปซซิ่งตรงกันทุกสเต็ป
 function StepFooter({ onBack, onNext, nextLabel, nextIcon = "arrow-right", nextDisabled = false, error }) {
@@ -85,16 +145,52 @@ export default function CustomerForm() {
   const navigate = useNavigate();
   const location = useLocation();
   const { t } = useLanguage();
-  const [current, setCurrent] = useState(0);
+  const [scope] = useState(draftStorageScope);
+  const [restored] = useState(() => readDraft(scope));
+  const [current, setCurrent] = useState(() => [0, 1, 2, 3].includes(restored?.step) ? restored.step : 0);
   const [data, setData] = useState(() => {
     const params = new URLSearchParams(location.search);
-    return { ...initialData, invitation_key: params.get("invitation_key") || "" };
+    return { ...initialData, ...restored?.data, invitation_key: params.get("invitation_key") || "" };
   });
+  const [editor, setEditor] = useState(restored?.editor ?? null);
+  const [draftSaved, setDraftSaved] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [done, setDone] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [signOutConfirmOpen, setSignOutConfirmOpen] = useState(false);
+  const leavingViaSignOut = useRef(false);
+  const draftData = { ...data, invitation_key: "" };
+  const hasDraft = !done && (editor?.dirty || JSON.stringify(draftData) !== emptyDraftData);
+  const blocker = useBlocker(({ currentLocation, nextLocation }) => (
+    Boolean(hasDraft) && !leavingViaSignOut.current
+    && (currentLocation.pathname !== nextLocation.pathname || currentLocation.search !== nextLocation.search)
+  ));
+
+  useLayoutEffect(() => {
+    try {
+      const storage = window[scope.storage];
+      if (hasDraft) {
+        const dataToStore = { ...data, invitation_key: "" };
+        storage.setItem(scope.key, JSON.stringify({ data: dataToStore, step: current, editor }));
+      } else {
+        storage.removeItem(scope.key);
+      }
+      setDraftSaved(true);
+    } catch {
+      setDraftSaved(false);
+    }
+  }, [scope, hasDraft, data, current, editor]);
+
+  useEffect(() => {
+    if (!hasDraft) return;
+    function beforeUnload(event) {
+      event.preventDefault();
+      event.returnValue = "";
+    }
+    window.addEventListener("beforeunload", beforeUnload);
+    return () => window.removeEventListener("beforeunload", beforeUnload);
+  }, [hasDraft]);
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -110,6 +206,7 @@ export default function CustomerForm() {
   }
 
   function handleSignOut() {
+    leavingViaSignOut.current = true;
     clearAuth();
     navigate("/");
   }
@@ -123,16 +220,10 @@ export default function CustomerForm() {
 
     setSubmitting(true);
     try {
-      const payload = {
-        ...data,
-        houses: data.platform === "tempview" ? [] : data.houses,
-      };
-      await createRegistration(payload);
+      await createRegistration(registrationPayload(data, t));
       setDone(true);
     } catch (err) {
-      setError(
-        err?.response?.data ? JSON.stringify(err.response.data) : t("submissionFailed")
-      );
+      setError(registrationErrorMessage(err, t));
     } finally {
       setSubmitting(false);
     }
@@ -197,13 +288,19 @@ export default function CustomerForm() {
                     </div>
                   </div>
 
+                  {hasDraft && (
+                    <p className={`border-b border-line px-7 py-2.5 text-[12px] sm:px-9 ${draftSaved ? "text-ink-soft" : "text-alert"}`}>
+                      {t(draftSaved ? "registrationDraftSaved" : "registrationDraftUnavailable")}
+                    </p>
+                  )}
+
                   <div className={`${current === 0 ? "block" : "hidden"}`}>
-                    <Step1CustomerInfo data={data} onChange={setData} />
+                    <Step1CustomerInfo data={data} onChange={setData} editor={editor?.type === "dealer" ? editor : null} onEditorChange={setEditor} />
                     <StepFooter onNext={next} nextLabel={t("next")} />
                   </div>
 
                   <div className={`${current === 1 ? "block" : "hidden"}`}>
-                    <Step2DeviceInfo active={current === 1} data={data} onChange={setData} />
+                    <Step2DeviceInfo active={current === 1} data={data} onChange={setData} editor={editor?.type === "equipment" ? editor : null} onEditorChange={setEditor} />
                     <StepFooter onBack={back} onNext={next} nextLabel={t("next")} />
                   </div>
 
@@ -234,6 +331,7 @@ export default function CustomerForm() {
           onCancel={() => setSignOutConfirmOpen(false)}
           onConfirm={handleSignOut}
         />
+        {blocker.state === "blocked" && <LeaveDraftDialog blocker={blocker} draftSaved={draftSaved} />}
       </div>
     </>
   );

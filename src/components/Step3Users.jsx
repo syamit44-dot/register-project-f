@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import Icon from "./Icon";
 import SearchableSelect from "./SearchableSelect";
 import { getSelectedControllerModels } from "../utils/registrationModels";
+import { APP_USERNAME_MAX_LENGTH, isValidAppUsername, sanitizeAppUsername } from "../utils/registrationPayload";
 import { useLanguage } from "../i18n.jsx";
 
 const USER_LIMIT = 5;
@@ -9,6 +10,7 @@ const USER_LIMIT = 5;
 export default function Step3Users({ data, onChange }) {
   const { t } = useLanguage();
   const [showUserTypeInfo, setShowUserTypeInfo] = useState(false);
+  const [showUsernameHelp, setShowUsernameHelp] = useState(false);
   // เก็บสถานะ ย่อ/ขยาย ของแต่ละกลุ่มด้วย key ของกลุ่ม — ค่าเริ่มต้นคือ "ขยาย" ทุกกลุ่ม
   // (ไม่ต้องระบุใน state ก็ถือว่าขยายอยู่ ยกเว้นจะถูกเพิ่มลง collapsedGroups)
   const [collapsedGroups, setCollapsedGroups] = useState(() => new Set());
@@ -36,13 +38,13 @@ export default function Step3Users({ data, onChange }) {
     ];
   }, [data.app_users, selectedModels, t]);
 
-  // เฉพาะกลุ่มที่จะแสดงจริงบนหน้าจอ (ตัดกลุ่ม "ทั่วไป" ออกถ้ามีการเลือกรุ่นเครื่องแล้ว)
+  // Keep orphaned users visible so they can be removed after a controller is changed.
   const visibleGroups = useMemo(
     () =>
       groups.filter(
-          (group) => !(group.key === "__unassigned__" && selectedModels.size > 0)
+          (group) => group.key !== "__unassigned__" || group.users.length > 0
       ),
-    [groups, selectedModels]
+    [groups]
   );
 
   const allCollapsed =
@@ -66,13 +68,7 @@ export default function Step3Users({ data, onChange }) {
   }
 
   function addUser(groupKey) {
-    // เช็คลิมิต 5 คน "ต่อกลุ่ม/ต่อรุ่น" ไม่ใช่รวมทั้งหมด — นับเฉพาะคนในกลุ่มที่กำลังจะเพิ่ม
-    const isUnassigned = groupKey === "__unassigned__";
-    const countInGroup = data.app_users.filter((u) =>
-      isUnassigned
-        ? !selectedModels.has(u.device_model)
-        : u.device_model === groupKey
-    ).length;
+    const countInGroup = data.app_users.filter((u) => u.device_model === groupKey).length;
     if (countInGroup >= USER_LIMIT) return;
 
     // เพิ่ม user ใหม่แล้วขยายกลุ่มนั้นให้เห็นแถวที่เพิ่งเพิ่มทันที
@@ -88,10 +84,10 @@ export default function Step3Users({ data, onChange }) {
       app_users: [
         ...data.app_users,
         {
-          username: "default1234",
+          username: "",
           email: "",
           user_type: "normal",
-          device_model: isUnassigned ? "" : groupKey,
+          device_model: groupKey,
         },
       ],
     });
@@ -116,8 +112,24 @@ export default function Step3Users({ data, onChange }) {
           <p className="mb-0.5 font-mono text-[11px] uppercase tracking-[0.06em] text-ink-soft">{t("part03")}</p>
           <h2 className="text-[18px] font-bold text-ink sm:text-[20px]">{t("appUsers")}</h2>
         </div>
+        <button
+          type="button"
+          onClick={() => setShowUsernameHelp((shown) => !shown)}
+          aria-label={t("appUsernameHelpTitle")}
+          aria-expanded={showUsernameHelp}
+          aria-controls="app-username-help"
+          className="ml-auto inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-line-strong bg-white text-sm font-bold text-brand-dark hover:bg-brand-tint"
+        >
+          ?
+        </button>
       </div>
       <div className="form-step-body px-7 py-8 sm:px-9 sm:py-9">
+        {showUsernameHelp && (
+          <div id="app-username-help" className="mb-4 rounded-xl border border-brand-tint bg-brand-tint px-4 py-3 text-sm leading-5 text-ink">
+            <p className="mb-1 font-semibold">{t("appUsernameHelpTitle")}</p>
+            <p>{t("registrationAppUsernameInvalid")}</p>
+          </div>
+        )}
           <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-2">
             <p className="text-[13px] font-bold uppercase tracking-[0.05em] text-ink-soft">
@@ -150,7 +162,7 @@ export default function Step3Users({ data, onChange }) {
         )}
 
         <div className="mt-4 space-y-4">
-          {selectedModels.size === 0 ? (
+          {visibleGroups.length === 0 ? (
             // ยังไม่ได้เลือกรุ่นเครื่องใน Step 2 เลย — ไม่ต้องโชว์ฟอร์มกรอกผู้ใช้
             // ให้เตือนไปกรอกข้อมูลรุ่นเครื่องก่อนแทน
             <div className="flex items-center gap-2.5 rounded-xl border border-dashed border-amber-tint bg-amber-tint px-4 py-4 text-[13.5px] text-amber">
@@ -199,14 +211,21 @@ export default function Step3Users({ data, onChange }) {
                               </label>
                               <input
                                 className="mono h-10 w-full rounded-xl border border-line-strong bg-white px-3 text-sm text-ink shadow-sm outline-none transition hover:border-brand/50 focus:border-brand focus:ring-4 focus:ring-brand-tint"
-                                placeholder="default1234"
+                                placeholder="name@farm"
+                                aria-label={t("Username")}
+                                aria-invalid={Boolean(u.username) && !isValidAppUsername(u.username)}
+                                pattern="[a-z0-9]+@[a-z0-9]+"
+                                maxLength={APP_USERNAME_MAX_LENGTH}
+                                autoCapitalize="none"
+                                spellCheck={false}
                                 value={u.username}
-                                onChange={(e) => setUserField(u.index, "username", e.target.value)}
+                                onChange={(e) => setUserField(u.index, "username", sanitizeAppUsername(e.target.value))}
                               />
                             </div>
                             <div>
                               <SearchableSelect
                                 label={t("UserType")}
+                                compact
                                 value={u.user_type}
                                 options={[
                                   { value: "normal", label: t("userTypeNormal") },
@@ -243,18 +262,20 @@ export default function Step3Users({ data, onChange }) {
                         ))}
                       </div>
 
-                      <button
-                        type="button"
-                        disabled={groupReachedLimit}
-                        className={`mt-3 inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm transition ${groupReachedLimit
-                          ? "cursor-not-allowed border-line-strong bg-line text-ink-soft"
-                          : "border-line-strong bg-white text-ink hover:border-brand-dark hover:bg-brand-tint"
-                          }`}
-                        onClick={() => addUser(group.key)}
-                      >
-                        <Icon name="plus" />
-                        {group.key === "__unassigned__" ? t("addUser") : t("addUserFor", { model: group.label })}
-                      </button>
+                      {group.key !== "__unassigned__" && (
+                        <button
+                          type="button"
+                          disabled={groupReachedLimit}
+                          className={`mt-3 inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm transition ${groupReachedLimit
+                            ? "cursor-not-allowed border-line-strong bg-line text-ink-soft"
+                            : "border-line-strong bg-white text-ink hover:border-brand-dark hover:bg-brand-tint"
+                            }`}
+                          onClick={() => addUser(group.key)}
+                        >
+                          <Icon name="plus" />
+                          {t("addUserFor", { model: group.label })}
+                        </button>
+                      )}
                       {groupReachedLimit && (
                         <p className="mt-2 flex items-center gap-1.5 text-[12px] text-alert">
                           <Icon name="info-circle" />
