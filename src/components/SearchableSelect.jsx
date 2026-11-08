@@ -52,8 +52,10 @@ export default function SearchableSelect({ label, required, value, options, onCh
   return (
     <div className="min-w-0">
       {label && (
-        <label htmlFor={inputId} className="mb-1.5 block text-[13px] font-semibold text-ink">
-          {label}{required && <span className="ml-0.5 text-alert">*</span>}
+        <label htmlFor={inputId} className="mb-1.5 block">
+          <span className="text-[13px] font-semibold text-ink">
+            {label}{required && <span className="ml-0.5 text-alert">*</span>}
+          </span>
         </label>
       )}
       <div className="relative">
