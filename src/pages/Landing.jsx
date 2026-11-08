@@ -1151,7 +1151,7 @@ export default function Landing() {
                             <div className="mb-5 border-t border-slate-100" />
                           </>
                         )}
-                        <div className={authMode === "Sign Up" ? "mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2" : "mb-4"}>
+                        <div className="mb-4 space-y-4">
                           <div>
                             <label htmlFor="auth-username" className="mb-1.5 block text-[15px] font-medium text-gray-600">
                               {t(authMode === "Sign Up" ? "signupUsernameLabel" : "loginIdentifierLabel")}<span className="ml-0.5 text-red-700">*</span>
