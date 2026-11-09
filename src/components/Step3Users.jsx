@@ -9,8 +9,7 @@ const USER_LIMIT = 5;
 
 export default function Step3Users({ data, onChange }) {
   const { t } = useLanguage();
-  const [showUserTypeInfo, setShowUserTypeInfo] = useState(false);
-  const [showUsernameHelp, setShowUsernameHelp] = useState(false);
+  const [showUserInfo, setShowUserInfo] = useState(false);
   // เก็บสถานะ ย่อ/ขยาย ของแต่ละกลุ่มด้วย key ของกลุ่ม — ค่าเริ่มต้นคือ "ขยาย" ทุกกลุ่ม
   // (ไม่ต้องระบุใน state ก็ถือว่าขยายอยู่ ยกเว้นจะถูกเพิ่มลง collapsedGroups)
   const [collapsedGroups, setCollapsedGroups] = useState(() => new Set());
@@ -112,34 +111,20 @@ export default function Step3Users({ data, onChange }) {
           <p className="mb-0.5 font-mono text-[11px] uppercase tracking-[0.06em] text-ink-soft">{t("part03")}</p>
           <h2 className="text-[18px] font-bold text-ink sm:text-[20px]">{t("appUsers")}</h2>
         </div>
-        <button
-          type="button"
-          onClick={() => setShowUsernameHelp((shown) => !shown)}
-          aria-label={t("appUsernameHelpTitle")}
-          aria-expanded={showUsernameHelp}
-          aria-controls="app-username-help"
-          className="ml-auto inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-line-strong bg-white text-sm font-bold text-brand-dark hover:bg-brand-tint"
-        >
-          ?
-        </button>
       </div>
       <div className="form-step-body px-7 py-8 sm:px-9 sm:py-9">
-        {showUsernameHelp && (
-          <div id="app-username-help" className="mb-4 rounded-xl border border-brand-tint bg-brand-tint px-4 py-3 text-sm leading-5 text-ink">
-            <p className="mb-1 font-semibold">{t("appUsernameHelpTitle")}</p>
-            <p>{t("registrationAppUsernameInvalid")}</p>
-          </div>
-        )}
-          <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-2">
             <p className="text-[13px] font-bold uppercase tracking-[0.05em] text-ink-soft">
               {t("userTypeShort")}
             </p>
             <button
               type="button"
-              onClick={() => setShowUserTypeInfo((prev) => !prev)}
+              onClick={() => setShowUserInfo((shown) => !shown)}
               className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-line-strong bg-white text-ink-soft transition hover:border-brand-dark hover:text-brand-dark"
-              aria-label={t("viewUserTypeInfoAria")}
+              aria-label={t("viewAppUserInfo")}
+              aria-expanded={showUserInfo}
+              aria-controls="app-user-info"
             >
               <Icon name="info-circle" style={{ fontSize: 14 }} />
             </button>
@@ -154,10 +139,19 @@ export default function Step3Users({ data, onChange }) {
             </button>
           )}
         </div>
-        {showUserTypeInfo && (
-          <div className="mt-3 flex items-start gap-2 rounded-xl border border-brand-tint bg-brand-tint px-3.5 py-2.5 text-sm leading-5 text-ink">
+        {showUserInfo && (
+          <div id="app-user-info" className="mt-3 flex items-start gap-2 rounded-xl border border-brand-tint bg-brand-tint px-3.5 py-2.5 text-sm leading-5 text-ink">
             <Icon name="info-circle" style={{ fontSize: 13 }} className="mt-0.5 shrink-0 text-brand" />
-            <span>{t("userTypeInfo")}</span>
+            <div className="space-y-3">
+              <div>
+                <p className="font-semibold">{t("appUsernameHelpTitle")}</p>
+                <p>{t("registrationAppUsernameInvalid")}</p>
+              </div>
+              <div>
+                <p className="font-semibold">{t("UserType")}</p>
+                <p>{t("userTypeInfo")}</p>
+              </div>
+            </div>
           </div>
         )}
 
@@ -200,66 +194,80 @@ export default function Step3Users({ data, onChange }) {
                   {!isCollapsed && (
                     <div className="border-t border-line p-4 pt-4 sm:px-5">
                       <div className="space-y-2">
-                        {group.users.map((u) => (
-                          <div
-                            className="grid gap-3 rounded-xl border border-line bg-mist/50 p-3.5 md:grid-cols-[1fr_1fr_1fr_auto]"
-                            key={u.index}
-                          >
-                            <div>
-                              <label className="mb-1 block text-[12px] font-semibold text-ink-soft">
-                                {t("Username")}
-                              </label>
-                              <input
-                                className="mono h-10 w-full rounded-xl border border-line-strong bg-white px-3 text-sm text-ink shadow-sm outline-none transition hover:border-brand/50 focus:border-brand focus:ring-4 focus:ring-brand-tint"
-                                placeholder="name@farm"
-                                aria-label={t("Username")}
-                                aria-invalid={Boolean(u.username) && !isValidAppUsername(u.username)}
-                                pattern="[a-z0-9]+@[a-z0-9]+"
-                                maxLength={APP_USERNAME_MAX_LENGTH}
-                                autoCapitalize="none"
-                                spellCheck={false}
-                                value={u.username}
-                                onChange={(e) => setUserField(u.index, "username", sanitizeAppUsername(e.target.value))}
-                              />
+                        {group.users.map((u) => {
+                          const invalidUsername = Boolean(u.username) && !isValidAppUsername(u.username);
+                          const usernameErrorId = `app-username-error-${u.index}`;
+                          return (
+                            <div
+                              className="grid gap-3 rounded-xl border border-line bg-mist/50 p-3.5 md:grid-cols-[1fr_1fr_1fr_auto]"
+                              key={u.index}
+                            >
+                              <div>
+                                <label className="mb-1 block text-[12px] font-semibold text-ink-soft">
+                                  {t("Username")}
+                                </label>
+                                <input
+                                  className={`mono h-10 w-full rounded-xl border bg-white px-3 text-sm text-ink shadow-sm outline-none transition focus:ring-4 ${
+                                    invalidUsername
+                                      ? "!border-alert focus:ring-alert-tint"
+                                      : "border-line-strong hover:border-brand/50 focus:border-brand focus:ring-brand-tint"
+                                  }`}
+                                  placeholder="name@farm"
+                                  aria-label={t("Username")}
+                                  aria-invalid={invalidUsername}
+                                  aria-describedby={invalidUsername ? usernameErrorId : undefined}
+                                  pattern="[a-z0-9]+@[a-z0-9]+"
+                                  maxLength={APP_USERNAME_MAX_LENGTH}
+                                  autoCapitalize="none"
+                                  spellCheck={false}
+                                  value={u.username}
+                                  onChange={(e) => setUserField(u.index, "username", sanitizeAppUsername(e.target.value))}
+                                />
+                                {invalidUsername && (
+                                  <p id={usernameErrorId} className="mt-1 text-[12px] text-alert">
+                                    {t("appUsernameFormatWarning")}
+                                  </p>
+                                )}
+                              </div>
+                              <div>
+                                <SearchableSelect
+                                  label={t("UserType")}
+                                  compact
+                                  value={u.user_type}
+                                  options={[
+                                    { value: "normal", label: t("userTypeNormal") },
+                                    { value: "super", label: t("userTypeSuper") },
+                                  ]}
+                                  onChange={({ value }) => setUserField(u.index, "user_type", value)}
+                                />
+                              </div>
+                              <div>
+                                <label className="mb-1 block text-[12px] font-semibold text-ink-soft">
+                                  {t("Email")}
+                                </label>
+                                <input
+                                  type="email"
+                                  className="mono h-10 w-full rounded-xl border border-line-strong bg-white px-3 text-sm text-ink shadow-sm outline-none transition hover:border-brand/50 focus:border-brand focus:ring-4 focus:ring-brand-tint"
+                                  placeholder="user@example.com"
+                                  value={u.email}
+                                  onChange={(e) => setUserField(u.index, "email", e.target.value)}
+                                />
+                              </div>
+                              <div className="flex flex-col justify-start">
+                                <label className="mb-1 block text-[12px] uppercase text-transparent select-none">
+                                  {t("delete")}
+                                </label>
+                                <button
+                                  type="button"
+                                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-line-strong bg-white text-alert transition hover:border-alert hover:bg-alert-tint"
+                                  onClick={() => removeUser(u.index)}
+                                >
+                                  <Icon name="trash" />
+                                </button>
+                              </div>
                             </div>
-                            <div>
-                              <SearchableSelect
-                                label={t("UserType")}
-                                compact
-                                value={u.user_type}
-                                options={[
-                                  { value: "normal", label: t("userTypeNormal") },
-                                  { value: "super", label: t("userTypeSuper") },
-                                ]}
-                                onChange={({ value }) => setUserField(u.index, "user_type", value)}
-                              />
-                            </div>
-                            <div>
-                              <label className="mb-1 block text-[12px] font-semibold text-ink-soft">
-                                {t("Email")}
-                              </label>
-                              <input
-                                type="email"
-                                className="mono h-10 w-full rounded-xl border border-line-strong bg-white px-3 text-sm text-ink shadow-sm outline-none transition hover:border-brand/50 focus:border-brand focus:ring-4 focus:ring-brand-tint"
-                                placeholder="user@example.com"
-                                value={u.email}
-                                onChange={(e) => setUserField(u.index, "email", e.target.value)}
-                              />
-                            </div>
-                            <div className="flex flex-col justify-start">
-                              <label className="mb-1 block text-[12px] uppercase text-transparent select-none">
-                                {t("delete")}
-                              </label>
-                              <button
-                                type="button"
-                                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-line-strong bg-white text-alert transition hover:border-alert hover:bg-alert-tint"
-                                onClick={() => removeUser(u.index)}
-                              >
-                                <Icon name="trash" />
-                              </button>
-                            </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
 
                       {group.key !== "__unassigned__" && (
