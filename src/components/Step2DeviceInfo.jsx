@@ -228,6 +228,29 @@ function ModelImagePreview({ image, svgHtml, name }) {
   );
 }
 
+function EquipmentSerialField({ disabled, value, onChange }) {
+  const { t } = useLanguage();
+
+  return (
+    <label className="block min-w-0 flex-1">
+      <span className="mb-1.5 block">
+        <span className="text-[13px] font-semibold text-ink">
+          S / N<span className="ml-0.5 text-alert">*</span>
+        </span>
+      </span>
+      <input
+        type="text"
+        aria-required="true"
+        className="block h-11 w-full rounded-xl border border-line-strong bg-white px-3.5 text-[13.5px] text-ink shadow-sm outline-none transition hover:border-brand/50 focus:border-brand focus:ring-4 focus:ring-brand-tint disabled:bg-mist disabled:text-ink-soft disabled:shadow-none"
+        placeholder={t("enterSerialNumber")}
+        disabled={disabled}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      />
+    </label>
+  );
+}
+
 export default function Step2DeviceInfo({ active, data, onChange, editor, onEditorChange }) {
   const { t } = useLanguage();
   const editingIndex = editor?.index ?? null;
@@ -638,24 +661,16 @@ export default function Step2DeviceInfo({ active, data, onChange, editor, onEdit
                   {draft.model_enabled && (
                     <div className="model-select-row mt-3">
                       <div className="flex-1">
-                        <div className="flex gap-3">
-                          <div className="flex-1">
+                        <div className="flex flex-col gap-3 sm:flex-row">
+                          <div className="min-w-0 flex-1">
                             {renderModelSelect("CONTROLLER", selectedModel, draft.device_models[0]?.model_name ?? modelData[selectedModel]?.name ?? selectedModel, (option) => selectEquipment("device_models", "model", option))}
                           </div>
                           {!isBulkEditing && (
-                            <div className="flex-1">
-                              <label className="block text-[13px] font-semibold text-ink">
-                                S / N<span className="ml-0.5 text-alert">*</span>
-                                <input
-                                  type="text"
-                                  className="mt-1.5 h-11 w-full rounded-xl border border-line-strong bg-white px-3.5 text-[13.5px] text-ink shadow-sm outline-none transition hover:border-brand/50 focus:border-brand focus:ring-4 focus:ring-brand-tint disabled:bg-mist disabled:text-ink-soft disabled:shadow-none"
-                                  placeholder={t("enterSerialNumber")}
-                                  disabled={!selectedModel}
-                                  value={draft.device_models?.[0]?.serial_number ?? ""}
-                                  onChange={(e) => changeEquipmentSerial("device_models", e.target.value)}
-                                />
-                              </label>
-                            </div>
+                            <EquipmentSerialField
+                              disabled={!selectedModel}
+                              value={draft.device_models?.[0]?.serial_number ?? ""}
+                              onChange={(value) => changeEquipmentSerial("device_models", value)}
+                            />
                           )}
                         </div>
                         {renderCommunicationPicker("device_communication", { showSmartlinkSerial: !isBulkEditing })}
@@ -682,24 +697,16 @@ export default function Step2DeviceInfo({ active, data, onChange, editor, onEdit
                   {draft.alarm_enabled && (
                     <div className="model-select-row mt-3">
                       <div className="flex-1">
-                        <div className="flex gap-3">
-                          <div className="flex-1">
+                        <div className="flex flex-col gap-3 sm:flex-row">
+                          <div className="min-w-0 flex-1">
                             {renderModelSelect("ALARM", selectedAlarms[0]?.key || "", selectedAlarms[0]?.model_name ?? summarizeAlarms(selectedAlarms), (option) => selectEquipment("alarms", "key", option))}
                           </div>
                           {!isBulkEditing && (
-                            <div className="flex-1">
-                              <label className="block text-[13px] font-semibold text-ink">
-                                S / N<span className="ml-0.5 text-alert">*</span>
-                                <input
-                                  type="text"
-                                  className="mt-1.5 h-11 w-full rounded-xl border border-line-strong bg-white px-3.5 text-[13.5px] text-ink shadow-sm outline-none transition hover:border-brand/50 focus:border-brand focus:ring-4 focus:ring-brand-tint disabled:bg-mist disabled:text-ink-soft disabled:shadow-none"
-                                  placeholder={t("enterSerialNumber")}
-                                  disabled={!selectedAlarms[0]?.key}
-                                  value={draft.alarms?.[0]?.serial_number ?? ""}
-                                  onChange={(e) => changeEquipmentSerial("alarms", e.target.value)}
-                                />
-                              </label>
-                            </div>
+                            <EquipmentSerialField
+                              disabled={!selectedAlarms[0]?.key}
+                              value={draft.alarms?.[0]?.serial_number ?? ""}
+                              onChange={(value) => changeEquipmentSerial("alarms", value)}
+                            />
                           )}
                         </div>
                         {renderCommunicationPicker("alarm_communication")}
@@ -726,24 +733,16 @@ export default function Step2DeviceInfo({ active, data, onChange, editor, onEdit
                   {draft.silonic_enabled && (
                     <div className="model-select-row mt-3">
                       <div className="flex-1">
-                        <div className="flex gap-3">
-                          <div className="flex-1">
+                        <div className="flex flex-col gap-3 sm:flex-row">
+                          <div className="min-w-0 flex-1">
                             {renderModelSelect("SILONIC", selectedSilonic[0]?.model || "", selectedSilonic[0]?.model_name ?? selectedSilonic[0]?.model, (option) => selectEquipment("silonic_models", "model", option))}
                           </div>
                           {!isBulkEditing && (
-                            <div className="flex-1">
-                              <label className="block text-[13px] font-semibold text-ink">
-                                S / N<span className="ml-0.5 text-alert">*</span>
-                                <input
-                                  type="text"
-                                  className="mt-1.5 h-11 w-full rounded-xl border border-line-strong bg-white px-3.5 text-[13.5px] text-ink shadow-sm outline-none transition hover:border-brand/50 focus:border-brand focus:ring-4 focus:ring-brand-tint disabled:bg-mist disabled:text-ink-soft disabled:shadow-none"
-                                  placeholder={t("enterSerialNumber")}
-                                  disabled={!selectedSilonic[0]?.model}
-                                  value={draft.silonic_models?.[0]?.serial_number ?? ""}
-                                  onChange={(e) => changeEquipmentSerial("silonic_models", e.target.value)}
-                                />
-                              </label>
-                            </div>
+                            <EquipmentSerialField
+                              disabled={!selectedSilonic[0]?.model}
+                              value={draft.silonic_models?.[0]?.serial_number ?? ""}
+                              onChange={(value) => changeEquipmentSerial("silonic_models", value)}
+                            />
                           )}
                         </div>
                         {renderCommunicationPicker("silonic_communication")}
@@ -770,24 +769,16 @@ export default function Step2DeviceInfo({ active, data, onChange, editor, onEdit
                   {draft.egg_enabled && (
                     <div className="model-select-row mt-3">
                       <div className="flex-1">
-                        <div className="flex gap-3">
-                          <div className="flex-1">
+                        <div className="flex flex-col gap-3 sm:flex-row">
+                          <div className="min-w-0 flex-1">
                             {renderModelSelect("EGG", selectedEggModels[0]?.model || "", selectedEggModels[0]?.model_name ?? selectedEggModels[0]?.model, (option) => selectEquipment("egg_models", "model", option))}
                           </div>
                           {!isBulkEditing && (
-                            <div className="flex-1">
-                              <label className="block text-[13px] font-semibold text-ink">
-                                S / N<span className="ml-0.5 text-alert">*</span>
-                                <input
-                                  type="text"
-                                  className="mt-1.5 h-11 w-full rounded-xl border border-line-strong bg-white px-3.5 text-[13.5px] text-ink shadow-sm outline-none transition hover:border-brand/50 focus:border-brand focus:ring-4 focus:ring-brand-tint disabled:bg-mist disabled:text-ink-soft disabled:shadow-none"
-                                  placeholder={t("enterSerialNumber")}
-                                  disabled={!selectedEggModels[0]?.model}
-                                  value={draft.egg_models?.[0]?.serial_number ?? ""}
-                                  onChange={(e) => changeEquipmentSerial("egg_models", e.target.value)}
-                                />
-                              </label>
-                            </div>
+                            <EquipmentSerialField
+                              disabled={!selectedEggModels[0]?.model}
+                              value={draft.egg_models?.[0]?.serial_number ?? ""}
+                              onChange={(value) => changeEquipmentSerial("egg_models", value)}
+                            />
                           )}
                         </div>
                         {renderCommunicationPicker("egg_communication")}

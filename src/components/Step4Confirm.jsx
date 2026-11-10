@@ -4,7 +4,7 @@ import modelData from "../data/modelData";
 import { getSelectedControllerModels } from "../utils/registrationModels";
 import { useLanguage } from "../i18n.jsx";
 
-const USER_TYPE_LABEL = { normal: "User", super: "Super user" };
+const USER_TYPE_KEYS = { normal: "userTypeNormal", super: "userTypeSuper" };
 
 // ตรงกับ COMMUNICATION_OPTIONS ใน Step2DeviceInfo — เหลือแค่ TempView / SmartLink
 // (silonic / farmnet ไม่ใช่ตัวเลือกการเชื่อมต่อแล้ว แต่เป็นหมวดอุปกรณ์ของตัวเอง)
@@ -72,42 +72,41 @@ function groupUsersByModel(appUsers, selectedModels) {
   }));
 }
 
-function InfoRow({ label, value, fallback }) {
+function InfoRow({ label, value, fallback, optional = false, className = "" }) {
   return (
-    <div className="py-1.5">
-      <p className="text-[12px] tracking-[0.03em] text-ink-soft">{label}</p>
-      <p className="mt-0.5 text-[13.5px] text-ink">
-        {value ? value : <span className="text-[13.5px] text-alert">{fallback}</span>}
-      </p>
+    <div className={`min-w-0 ${className}`}>
+      <dt className="text-xs font-medium text-ink-soft">{label}</dt>
+      <dd className="mt-1 break-words text-sm text-ink">
+        {value || <span className={optional ? "text-ink-soft" : "text-alert"}>{fallback}</span>}
+      </dd>
     </div>
   );
 }
 
-function SummarySection({ title, hint, onEdit, children }) {
+function SummarySection({ icon, title, hint, onEdit, children }) {
   const { t } = useLanguage();
   return (
-    <div className="summary-section overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_2px_8px_rgba(22,35,61,0.035)]">
-      <div className="flex items-center gap-3 border-b border-line bg-[#f4f8fc] px-5 py-3.5">
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-tint text-brand-dark">
-          <Icon name="clipboard-text" style={{ fontSize: 15 }} />
+    <section>
+      <div className="mb-5 flex items-center gap-3 border-b border-line pb-3">
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-tint text-brand-dark">
+          <Icon name={icon} style={{ fontSize: 15 }} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <h3 className="text-[12.5px] font-bold uppercase tracking-[0.06em] text-brand-dark">{title}</h3>
+          {hint && <p className="mt-0.5 text-xs text-ink-soft">{hint}</p>}
         </div>
-        <div className="flex-1">
-          <p className="text-[13.5px] font-bold text-ink">{title}</p>
-          {hint && <p className="text-[12px] text-ink-soft">{hint}</p>}
-        </div>
-        {onEdit && (
-          <button
-            type="button"
-            onClick={onEdit}
-            className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[12.5px] font-semibold text-brand transition hover:bg-brand-tint"
-          >
-            {t("edit")}
-            <Icon name="arrow-right" style={{ fontSize: 11 }} />
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={onEdit}
+          aria-label={`${t("edit")} ${title}`}
+          className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg border border-line-strong bg-white px-3 text-[12.5px] font-semibold text-brand transition hover:border-brand hover:bg-brand-tint focus-visible:outline-brand"
+        >
+          <Icon name="edit" style={{ fontSize: 12 }} />
+          {t("edit")}
+        </button>
       </div>
-      <div className="p-5">{children}</div>
-    </div>
+      {children}
+    </section>
   );
 }
 
@@ -240,63 +239,38 @@ export default function Step4Confirm({ data, onChange, onGoTo }) {
         </div>
       </div>
       <div className="form-step-body px-7 py-8 sm:px-9 sm:py-9">
-        <p className="mb-4 text-[13.5px] text-ink-soft">
-          {t("reviewHint")}
-        </p>
+        <p className="mb-8 text-[13.5px] leading-6 text-ink-soft">{t("reviewHint")}</p>
 
-        <div className="space-y-5">
-          {/* ---------- ข้อมูลฟาร์ม ---------- */}
-          <SummarySection title={t("farmSummary")} hint={t("farmSummaryHint")} onEdit={() => onGoTo?.(0)}>
-            <div className="grid gap-x-4 gap-y-1 sm:grid-cols-2">
+        <div className="space-y-8">
+          <SummarySection icon="barn" title={t("farmSummary")} onEdit={() => onGoTo?.(0)}>
+            <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
               <InfoRow label={t("farmNameCompany")} value={data.farm_name} fallback={t("notProvided")} />
               <InfoRow label={t("companyName")} value={data.farm_short} fallback={t("notProvided")} />
               <InfoRow label={t("numberOfHouses")} value={`${data.house_count} ${t("house")}${Number(data.house_count) > 1 ? "s" : ""}`} fallback={t("notProvided")} />
               <InfoRow label={t("timezone")} value={data.timezone} fallback={t("notProvided")} />
               <InfoRow label={t("address")} value={fullAddress} fallback={t("notProvided")} />
-              <div className="py-1.5">
-                <p className="text-[12px] tracking-[0.03em] text-ink-soft">{t("invitationKey")}</p>
-                <p className="mt-0.5 text-[13.5px] text-ink">
-                  {data.invitation_key || <span className="text-[13.5px] text-ink-soft">{t("notSpecified")}</span>}
-                </p>
-              </div>
-            </div>
-            <div className="mt-3 border-t border-line pt-3">
-              <div className="grid gap-x-4 gap-y-1 sm:grid-cols-3">
-                <InfoRow label={t("contactName")} value={data.contact_name} fallback={t("notProvided")} />
-                <InfoRow label={t("phoneNumber")} value={data.contact_phone} fallback={t("notProvided")} />
-                <InfoRow label={t("email")} value={data.contact_email} fallback={t("notProvided")} />
-                <div className="py-1.5">
-                  <p className="text-[12px] tracking-[0.03em] text-ink-soft">{t("dealerName")}</p>
-                  <p className="mt-0.5 text-[13.5px] text-ink">
-                    {data.dealer_name || <span className="text-[13.5px] text-alert">{t("notProvided")}</span>}
-                  </p>
-                </div>
-                <div className="py-1.5 sm:col-span-2">
-                  <p className="text-[12px] tracking-[0.03em] text-ink-soft">{t("dealerContact")}</p>
-                  <p className="mt-0.5 text-[13.5px] text-ink">
-                    {dealerContactParts.length > 0 ? (
-                      dealerContactParts.join(" · ")
-                    ) : (
-                      <span className="text-[13.5px] text-alert">{t("notProvided")}</span>
-                    )}
-                  </p>
-                </div>
-              </div>
-            </div>
+              <InfoRow label={t("invitationKey")} value={data.invitation_key} fallback={t("notSpecified")} optional />
+            </dl>
+            <dl className="mt-5 grid gap-x-6 gap-y-4 border-t border-line pt-5 sm:grid-cols-2 lg:grid-cols-3">
+              <InfoRow label={t("contactName")} value={data.contact_name} fallback={t("notProvided")} />
+              <InfoRow label={t("phoneNumber")} value={data.contact_phone} fallback={t("notProvided")} />
+              <InfoRow label={t("email")} value={data.contact_email} fallback={t("notProvided")} />
+              <InfoRow label={t("dealerName")} value={data.dealer_name} fallback={t("notProvided")} />
+              <InfoRow label={t("dealerContact")} value={dealerContactParts.join(" · ")} fallback={t("notProvided")} className="lg:col-span-2" />
+            </dl>
           </SummarySection>
 
-          {/* ---------- ข้อมูลเครื่อง (ต่อ House — ตรงกับ Step2DeviceInfo) ---------- */}
-          <SummarySection title={t("deviceSummaryShort")} hint={t("deviceSummaryHint")} onEdit={() => onGoTo?.(1)}>
-            <div className="space-y-3">
+          <SummarySection icon="device" title={t("deviceSummary")} onEdit={() => onGoTo?.(1)}>
+            <ul className="divide-y divide-line">
               {houses.map((h, i) => {
                 const fields = [
-                  { label: t("deviceModel"), text: h.model_enabled ? summarizeModels(h.device_models) : "", missing: true },
-                  { label: t("alarmController"), text: h.alarm_enabled ? summarizeAlarms(h.alarms) : "", missing: false },
-                  { label: t("communicationSilonic"), text: h.silonic_enabled ? summarizeSilonic(h.silonic_models) : "", missing: false },
-                  { label: t("egg"), text: h.egg_enabled ? summarizeEggModels(h.egg_models) : "", missing: false },
+                  { label: t("deviceModel"), value: h.model_enabled ? summarizeModels(h.device_models) : "" },
+                  { label: t("alarmController"), value: h.alarm_enabled ? summarizeAlarms(h.alarms) : "", optional: true },
+                  { label: t("communicationSilonic"), value: h.silonic_enabled ? summarizeSilonic(h.silonic_models) : "", optional: true },
+                  { label: t("egg"), value: h.egg_enabled ? summarizeEggModels(h.egg_models) : "", optional: true },
                   {
                     label: t("communication"),
-                    text: summarizeCommunication(
+                    value: summarizeCommunication(
                       mergeCommunications(
                         h.device_communication,
                         h.alarm_communication,
@@ -306,80 +280,59 @@ export default function Step4Confirm({ data, onChange, onGoTo }) {
                       ),
                       t
                     ),
-                    missing: true,
                   },
                 ];
                 return (
-                  <div key={i} className="rounded-xl border border-line bg-white p-4">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand text-[13px] font-bold text-white">
+                  <li key={i} className="py-4 first:pt-0 last:pb-0">
+                    <h4 className="flex items-center gap-2.5 break-words text-sm font-bold text-ink">
+                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-brand text-xs text-white" aria-hidden="true">
                         {i + 1}
-                      </div>
-                      <p className="text-[14px] font-bold text-ink">{h.name}</p>
-                    </div>
-                    <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2.5 border-t border-line pt-3 sm:grid-cols-3">
-                      {fields.map((f) => (
-                        <div key={f.label} className="min-w-0">
-                          <p className="text-[10.5px] font-semibold uppercase tracking-[0.05em] text-ink-soft">{f.label}</p>
-                          <p className="mt-0.5 truncate text-[13px] text-ink">
-                            {f.text || (
-                              <span className={`pill ${f.missing ? "pill-missing" : "pill-neutral"}`}>
-                                {f.missing ? t("notProvided") : t("notSpecified")}
-                              </span>
-                            )}
-                          </p>
-                        </div>
+                      </span>
+                      <span className="min-w-0">{h.name}</span>
+                    </h4>
+                    <dl className="mt-3 grid grid-cols-2 gap-x-5 gap-y-3 sm:grid-cols-3 xl:grid-cols-5">
+                      {fields.map(({ label, value, optional }) => (
+                        <InfoRow key={label} label={label} value={value} fallback={t(optional ? "notSpecified" : "notProvided")} optional={optional} />
                       ))}
-                    </div>
-                  </div>
+                    </dl>
+                  </li>
                 );
               })}
-              {houses.length === 0 && (
-                <div className="rounded-xl border border-dashed border-line-strong bg-mist/60 p-8 text-center text-[13.5px] text-ink-soft">
-                  {t("noHouseData")}
-                </div>
-              )}
-            </div>
+            </ul>
+            {houses.length === 0 && <p className="text-sm text-ink-soft">{t("noHouseData")}</p>}
           </SummarySection>
 
-          {/* ---------- ผู้ใช้งานแอป (แยกตามรุ่นเครื่อง — ตรงกับการจัดกลุ่มใน Step3Users) ---------- */}
-          <SummarySection title={t("appUsersSummaryShort")} hint={t("appUsersSummaryHint", { count: appUsers.length })} onEdit={() => onGoTo?.(2)}>
-            <div className="space-y-3">
+          <SummarySection icon="user" title={t("appUsersSummary")} hint={t("appUsersSummaryHint", { count: appUsers.length })} onEdit={() => onGoTo?.(2)}>
+            <div className="divide-y divide-line">
               {userGroups.map((group) => (
-                <div key={group.key} className="overflow-hidden rounded-xl border border-line bg-white">
-                  <div className="flex items-center gap-2 border-b border-line bg-mist px-4 py-2.5">
-                    <Icon name="user" style={{ fontSize: 13 }} className="text-brand" />
-                    <p className="text-[13px] font-semibold text-ink">{group.label}</p>
+                <div key={group.key} className="py-4 first:pt-0 last:pb-0">
+                  <h4 className="flex items-center gap-2 text-sm font-bold text-ink">
+                    {group.label}
                     <span className="pill pill-brand">{group.users.length}</span>
-                  </div>
-                  <div className="divide-y divide-line">
-                    {group.users.map((u, i) => (
-                      <div key={i} className="flex flex-wrap items-center gap-x-6 gap-y-1.5 px-4 py-3">
-                        <div className="flex min-w-[150px] flex-1 items-center gap-1.5 font-mono text-[13px] text-ink">
-                          <Icon name="user" style={{ fontSize: 11 }} className="shrink-0 text-ink-soft" />
-                          {u.username || <span className="pill pill-missing">{t("notProvided")}</span>}
-                        </div>
-                        <div className="min-w-[160px] flex-1 truncate text-[13px] text-ink-soft">
-                          {u.email || <span className="pill pill-missing">{t("notProvided")}</span>}
-                        </div>
-                        <span className="pill pill-neutral shrink-0">{USER_TYPE_LABEL[u.user_type] ?? u.user_type}</span>
-                      </div>
-                    ))}
-                    {group.users.length === 0 && (
-                      <div className="px-4 py-6 text-center text-[13px] text-ink-soft">{t("noUsersInGroup")}</div>
-                    )}
-                  </div>
+                  </h4>
+                  {group.users.length > 0 ? (
+                    <ul className="mt-2 space-y-2">
+                      {group.users.map((u, i) => (
+                        <li key={i} className="grid items-start gap-1 text-sm sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:gap-x-4">
+                          <span className="break-words font-mono text-ink">
+                            {u.username || <span className="font-sans text-alert">{t("notProvided")}</span>}
+                          </span>
+                          <span className="break-words text-ink-soft">
+                            {u.email || <span className="text-alert">{t("notProvided")}</span>}
+                          </span>
+                          <span className="pill pill-neutral justify-self-start">{USER_TYPE_KEYS[u.user_type] ? t(USER_TYPE_KEYS[u.user_type]) : u.user_type}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : <p className="mt-2 text-sm text-ink-soft">{t("noUsersInGroup")}</p>}
                 </div>
               ))}
-              {userGroups.length === 0 && (
-                <p className="px-3 py-6 text-center text-ink-soft">{t("noUsersInGroup")}</p>
-              )}
             </div>
+            {userGroups.length === 0 && <p className="text-sm text-ink-soft">{t("noUsersInGroup")}</p>}
           </SummarySection>
         </div>
 
-        {/* ---------- หมายเหตุ + PDPA (ของเดิม) ---------- */}
-        <label className="mt-5 block border-t border-line pt-5 text-[13.5px] font-semibold text-ink">
+        <label className="mt-8 block border-t border-line pt-5 text-[13.5px] font-semibold text-ink">
           {t("note")}
           <textarea
             className="mt-1.5 min-h-[84px] w-full resize-none rounded-xl border border-line-strong bg-white px-3.5 py-2.5 text-[13.5px] font-normal text-ink shadow-sm outline-none transition hover:border-brand/50 focus:border-brand focus:ring-4 focus:ring-brand-tint"
@@ -389,7 +342,7 @@ export default function Step4Confirm({ data, onChange, onGoTo }) {
             onChange={(e) => onChange({ ...data, note: e.target.value })}
           />
         </label>
-        <label className="mt-5 flex items-start gap-2.5 border-t border-line pt-4 text-[13.5px] text-ink-soft">
+        <label className="mt-4 flex items-start gap-2.5 text-[13.5px] text-ink-soft">
           <input
             className="mt-0.5 h-4 w-4 accent-brand-dark"
             type="checkbox"

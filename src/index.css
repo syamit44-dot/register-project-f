@@ -350,9 +350,6 @@ button {
 .form-step-body .rounded-xl.border-slate-200.bg-white.user-group-panel {
   border-radius: 12px;
 }
-.form-step-body .summary-section.rounded-xl.border-slate-200.bg-white {
-  border-radius: 12px;
-}
 .form-step-body .house-summary-panel {
   border-radius: 14px !important;
   overflow: hidden;
