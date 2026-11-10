@@ -16,17 +16,17 @@ function decodeJwtExpiry(token) {
   }
 }
 
-export function saveAuth({ username, email, token, first_name, last_name }) {
-  const data = { username, email, token, first_name, last_name, expiresAt: decodeJwtExpiry(token) };
+export function saveAuth({ username, email, token, first_name, last_name, account_type = "customer" }) {
+  const data = { username, email, token, first_name, last_name, account_type, expiresAt: decodeJwtExpiry(token) };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   return data;
 }
 
 // ใช้ตอน /api/refresh ได้ access token ใหม่มา — อัปเดตแค่ token/expiresAt เก็บฟิลด์อื่นไว้เหมือนเดิม
-export function updateAccessToken(newToken) {
+export function updateAccessToken(newToken, accountType) {
   const current = getAuth();
   if (!current) return null;
-  const next = { ...current, token: newToken, expiresAt: decodeJwtExpiry(newToken) };
+  const next = { ...current, account_type: accountType ?? current.account_type, token: newToken, expiresAt: decodeJwtExpiry(newToken) };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
   return next;
 }

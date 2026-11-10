@@ -19,7 +19,9 @@ export function sanitizeAppUsername(value) {
   return (farm.length ? `${name}@${farm.join("")}` : name).slice(0, APP_USERNAME_MAX_LENGTH);
 }
 
-export function registrationPayload(data, t) {
+export const FARM_APP_USER_LIMIT = 5;
+
+export function registrationPayload(data, t, isDealer = false) {
   const equipment = { device: [], alarm: [], silonic: [], egg: [] };
   const controllerIds = new Map();
 
@@ -53,21 +55,29 @@ export function registrationPayload(data, t) {
   });
 
   const farmName = data.farm_name.trim();
-  const userapp = data.app_users
-    .filter((user) => user.device_model || user.email || user.username !== "default1234")
-    .map((user) => {
-      const model = controllerIds.get(user.device_model);
-      if (!model) throw new RegistrationInputError(t("registrationUserNeedsController"));
-      if (!isValidAppUsername(user.username)) {
-        throw new RegistrationInputError(t("registrationAppUsernameInvalid"));
-      }
-      return {
-        username: user.username,
-        deviceModel: model,
-        userType: user.user_type === "super" ? "Superuser" : "User",
-        userEmail: user.email?.trim() || null,
-      };
-    });
+  const appUsers = data.app_users.filter((user) => user.device_model || user.email || user.username !== "default1234");
+  const mainUsers = appUsers.filter((user) => !user.is_dealer);
+  const dealerCount = appUsers.length - mainUsers.length;
+  if (mainUsers.length > FARM_APP_USER_LIMIT) throw new RegistrationInputError(t("userLimitWarning"));
+  if (mainUsers.filter((user) => user.user_type === "super").length > 1) {
+    throw new RegistrationInputError(t("appSuperuserLimit"));
+  }
+  if (dealerCount > Number(isDealer)) throw new RegistrationInputError(t("dealerAppUserLimit"));
+
+  const userapp = appUsers.map((user) => {
+    const model = controllerIds.get(user.device_model);
+    if (!model) throw new RegistrationInputError(t("registrationUserNeedsController"));
+    if (!isValidAppUsername(user.username)) {
+      throw new RegistrationInputError(t("registrationAppUsernameInvalid"));
+    }
+    return {
+      username: user.username,
+      deviceModel: model,
+      userType: user.user_type === "super" ? "Superuser" : "Normaluser",
+      isDealer: Boolean(user.is_dealer),
+      userEmail: user.email?.trim() || null,
+    };
+  });
 
   return {
     farm: {

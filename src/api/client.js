@@ -37,7 +37,7 @@ function requestNewAccessToken() {
       .then((res) => {
         const newToken = res.data?.access_token;
         if (!newToken) throw new Error("No access_token in /refresh response");
-        updateAccessToken(newToken);
+        updateAccessToken(newToken, res.data?.account_type);
         return newToken;
       })
       .catch((err) => {
@@ -148,9 +148,9 @@ export function signIn({ username, password, captcha_token, isAdmin = false }) {
 /* ---------- Sign up (พร้อม Cloudflare Turnstile + Access Key) ---------- */
 
 // ยิงไปที่ Django Api_SignUp — accessKey บังคับเสมอ (backend ปฏิเสธถ้าไม่มี/ใช้ไปแล้ว)
-export function signUp({ username, email, password, first_name, last_name, mobile, country, accessKey, captcha_token }) {
+export function signUp({ username, account_type, email, password, first_name, last_name, mobile, country, accessKey, captcha_token }) {
   return api
-    .post("/signup", { username, email, password, first_name, last_name, mobile, country, accessKey, captcha_token })
+    .post("/signup", { username, account_type, email, password, first_name, last_name, mobile, country, accessKey, captcha_token })
     .then((res) => res.data);
 }
 
@@ -201,9 +201,10 @@ function toFarmSummary({ farm, device, alarm, egg, silonic, userapp }, modelName
     created_at: farm.date_created,
     updated_at: farm.date_edit,
     houses: [...houses.values()].sort((a, b) => Number(a.id) - Number(b.id)),
-    app_users: userapp.map(({ id, username, userType }) => ({
+    app_users: userapp.map(({ id, username, userType, isDealer }) => ({
       id,
       username,
+      is_dealer: Boolean(isDealer),
       user_type: userType === "Superuser" ? "super" : "normal",
     })),
   };

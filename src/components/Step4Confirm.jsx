@@ -306,7 +306,7 @@ export default function Step4Confirm({ data, onChange, onGoTo }) {
                           <dl className="grid gap-x-4 gap-y-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)_minmax(6rem,0.6fr)]">
                             <InfoRow label={t("Username")} value={user.username && <span className="font-mono">{user.username}</span>} fallback={t("notProvided")} />
                             <InfoRow label={t("email")} value={user.email?.trim()} fallback={t("notSpecified")} optional />
-                            <InfoRow label={t("UserType")} value={t(USER_TYPE_KEYS[user.user_type] ?? "userTypeNormal")} />
+                            <InfoRow label={t("UserType")} value={<>{t(USER_TYPE_KEYS[user.user_type] ?? "userTypeNormal")}{user.is_dealer && <span className="ml-2 pill pill-brand">{t("dealerAppUser")}</span>}</>} />
                           </dl>
                         </li>
                       ))}

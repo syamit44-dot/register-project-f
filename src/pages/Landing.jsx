@@ -26,6 +26,7 @@ const USERNAME_MAX_LENGTH = 50;
 const USERNAME_PATTERN = /^[A-Za-z0-9]+$/;
 const EMAIL_PATTERN = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
 const SIGNUP_FIELD_ERRORS = {
+  invalid_account_type: ["accountType", "signupAccountTypeRequired"],
   invalid_username: ["username", "signupUsernameRules"],
   username_taken: ["username", "signupUsernameTaken"],
   invalid_email: ["email", "signupEmailInvalid"],
@@ -62,6 +63,7 @@ export default function Landing() {
   const [isCountryOpen, setIsCountryOpen] = useState(false);
   const [error, setError] = useState("");
   const [fieldErrors, setFieldErrors] = useState({});
+  const [accountType, setAccountType] = useState("");
   const [invitationKey, setInvitationKey] = useState("");
   const [invitationError, setInvitationError] = useState("");
   const [invitationVerifying, setInvitationVerifying] = useState(false);
@@ -214,6 +216,7 @@ export default function Landing() {
     const isSignup = authMode === "Sign Up";
     const nextFieldErrors = {};
     if (isSignup) {
+      if (!accountType) nextFieldErrors.accountType = t("signupAccountTypeRequired");
       if (username.length > USERNAME_MAX_LENGTH || !USERNAME_PATTERN.test(username)) {
         nextFieldErrors.username = t("signupUsernameRules");
       }
@@ -272,6 +275,7 @@ export default function Landing() {
         });
         saveAuth({
           username: data.username,
+          account_type: data.account_type,
           email: data.email,
           token: data.access_token,
           first_name: data.first_name,
@@ -294,6 +298,7 @@ export default function Landing() {
       const captchaToken = await captchaRef.current.getToken();
       await signUp({
         username,
+        account_type: accountType,
         email: email.trim(),
         password,
         first_name: firstName.trim(),
@@ -326,6 +331,7 @@ export default function Landing() {
   };
 
   const handleClearData = () => {
+    setAccountType("");
     setPassword("");
     setUsername("");
     setEmail("");
@@ -1205,6 +1211,29 @@ export default function Landing() {
                                 className={`auth-input ${fieldErrors.email ? "auth-input-error" : ""}`}
                               />
                               {fieldErrors.email && <p className="mt-1.5 text-[13px] font-medium text-red-600">{fieldErrors.email}</p>}
+                            </div>
+                          )}
+                          {authMode === "Sign Up" && (
+                            <div>
+                              <label htmlFor="auth-account-type" className="mb-1.5 block text-[15px] font-medium text-gray-600">
+                                {t("signupAccountType")}<span className="ml-0.5 text-red-700">*</span>
+                              </label>
+                              <select
+                                id="auth-account-type"
+                                value={accountType}
+                                required
+                                aria-invalid={Boolean(fieldErrors.accountType)}
+                                className={`auth-input ${fieldErrors.accountType ? "auth-input-error" : ""}`}
+                                onChange={(e) => {
+                                  setAccountType(e.target.value);
+                                  setFieldErrors((prev) => ({ ...prev, accountType: undefined }));
+                                }}
+                              >
+                                <option value="" disabled>{t("signupAccountTypeRequired")}</option>
+                                <option value="customer">{t("signupCustomerType")}</option>
+                                <option value="dealer">{t("signupDealerType")}</option>
+                              </select>
+                              {fieldErrors.accountType && <p className="mt-1.5 text-[13px] font-medium text-red-600">{fieldErrors.accountType}</p>}
                             </div>
                           )}
                         </div>

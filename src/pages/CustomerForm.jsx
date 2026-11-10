@@ -211,7 +211,7 @@ export default function CustomerForm() {
 
     setSubmitting(true);
     try {
-      await createRegistration(registrationPayload(data, t));
+      await createRegistration(registrationPayload(data, t, getAuth()?.account_type === "dealer"));
       setDone(true);
     } catch (err) {
       setError(registrationErrorMessage(err, t));
@@ -296,7 +296,7 @@ export default function CustomerForm() {
                   </div>
 
                   <div className={`${current === 2 ? "block" : "hidden"}`}>
-                    <Step3Users data={data} onChange={setData} />
+                    <Step3Users data={data} onChange={setData} isDealer={getAuth()?.account_type === "dealer"} />
                     <StepFooter onBack={back} onNext={next} nextLabel={t("next")} />
                   </div>
 

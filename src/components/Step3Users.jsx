@@ -2,12 +2,12 @@ import { useMemo, useState } from "react";
 import Icon from "./Icon";
 import SearchableSelect from "./SearchableSelect";
 import { getSelectedControllerModels } from "../utils/registrationModels";
-import { APP_USERNAME_MAX_LENGTH, isValidAppUsername, sanitizeAppUsername } from "../utils/registrationPayload";
+import { APP_USERNAME_MAX_LENGTH, FARM_APP_USER_LIMIT, isValidAppUsername, sanitizeAppUsername } from "../utils/registrationPayload";
 import { useLanguage } from "../i18n.jsx";
 
-const USER_LIMIT = 5;
+const DEALER_GROUP = "__dealer__";
 
-export default function Step3Users({ data, onChange }) {
+export default function Step3Users({ data, onChange, isDealer }) {
   const { t } = useLanguage();
   const [showUserInfo, setShowUserInfo] = useState(false);
   // เก็บสถานะ ย่อ/ขยาย ของแต่ละกลุ่มด้วย key ของกลุ่ม — ค่าเริ่มต้นคือ "ขยาย" ทุกกลุ่ม
@@ -15,6 +15,10 @@ export default function Step3Users({ data, onChange }) {
   const [collapsedGroups, setCollapsedGroups] = useState(() => new Set());
 
   const selectedModels = useMemo(() => getSelectedControllerModels(data.houses), [data.houses]);
+
+  const mainUsers = data.app_users.filter((user) => !user.is_dealer);
+  const mainLimitReached = mainUsers.length >= FARM_APP_USER_LIMIT;
+  const mainSuperusers = mainUsers.filter((user) => user.user_type === "super").length;
 
   // จัดกลุ่ม app_users ตาม device_model — คนที่ไม่มี device_model หรือ device_model
   // ไม่ตรงกับรุ่นที่เลือกไว้ในตอนนี้ (เช่น ลบรุ่นออกจาก Step 2 ไปแล้ว) จะตกไปกลุ่ม "ทั่วไป"
@@ -24,18 +28,24 @@ export default function Step3Users({ data, onChange }) {
       label,
       users: data.app_users
         .map((u, index) => ({ ...u, index }))
-        .filter((u) => u.device_model === key),
+        .filter((u) => !u.is_dealer && u.device_model === key),
     }));
 
     const unassigned = data.app_users
       .map((u, index) => ({ ...u, index }))
-      .filter((u) => !selectedModels.has(u.device_model));
+      .filter((u) => !u.is_dealer && !selectedModels.has(u.device_model));
+
+    const dealerUsers = data.app_users.map((u, index) => ({ ...u, index })).filter((u) => u.is_dealer);
+    const dealerGroup = isDealer && (selectedModels.size > 0 || dealerUsers.length > 0)
+      ? [{ key: DEALER_GROUP, label: t("dealerAppUser"), users: dealerUsers }]
+      : [];
 
     return [
       ...modelGroups,
       { key: "__unassigned__", label: t("unassignedGroup"), users: unassigned },
+      ...dealerGroup,
     ];
-  }, [data.app_users, selectedModels, t]);
+  }, [data.app_users, selectedModels, isDealer, t]);
 
   // Keep orphaned users visible so they can be removed after a controller is changed.
   const visibleGroups = useMemo(
@@ -67,8 +77,8 @@ export default function Step3Users({ data, onChange }) {
   }
 
   function addUser(groupKey) {
-    const countInGroup = data.app_users.filter((u) => u.device_model === groupKey).length;
-    if (countInGroup >= USER_LIMIT) return;
+    const isDealerUser = groupKey === DEALER_GROUP;
+    if (isDealerUser ? !isDealer || !selectedModels.size || data.app_users.some((u) => u.is_dealer) : mainLimitReached) return;
 
     // เพิ่ม user ใหม่แล้วขยายกลุ่มนั้นให้เห็นแถวที่เพิ่งเพิ่มทันที
     setCollapsedGroups((prev) => {
@@ -86,7 +96,8 @@ export default function Step3Users({ data, onChange }) {
           username: "",
           email: "",
           user_type: "normal",
-          device_model: groupKey,
+          device_model: isDealerUser ? selectedModels.keys().next().value : groupKey,
+          is_dealer: isDealerUser,
         },
       ],
     });
@@ -155,6 +166,10 @@ export default function Step3Users({ data, onChange }) {
           </div>
         )}
 
+        <p className="mt-3 text-sm text-ink-soft">{t("appUserLimits", { count: mainUsers.length })}</p>
+        {mainUsers.length > FARM_APP_USER_LIMIT && <p role="alert" className="mt-1 text-sm text-alert">{t("userLimitWarning")}</p>}
+        {mainSuperusers > 1 && <p role="alert" className="mt-1 text-sm text-alert">{t("appSuperuserLimit")}</p>}
+        {isDealer && <p className="mt-1 text-sm text-ink-soft">{t("dealerAppUserLimit")}</p>}
         <div className="mt-4 space-y-4">
           {visibleGroups.length === 0 ? (
             // ยังไม่ได้เลือกรุ่นเครื่องใน Step 2 เลย — ไม่ต้องโชว์ฟอร์มกรอกผู้ใช้
@@ -166,7 +181,8 @@ export default function Step3Users({ data, onChange }) {
           ) : (
             visibleGroups.map((group) => {
               const isCollapsed = collapsedGroups.has(group.key);
-              const groupReachedLimit = group.users.length >= USER_LIMIT;
+              const dealerGroup = group.key === DEALER_GROUP;
+              const groupReachedLimit = dealerGroup ? group.users.length > 0 || !selectedModels.size : mainLimitReached;
 
               return (
                 <div key={group.key} className="user-group-panel rounded-xl border border-slate-200 bg-white shadow-[0_2px_8px_rgba(22,35,61,0.035)]">
@@ -196,12 +212,24 @@ export default function Step3Users({ data, onChange }) {
                       <div className="space-y-2">
                         {group.users.map((u) => {
                           const invalidUsername = Boolean(u.username) && !isValidAppUsername(u.username);
+                          const canSelectSuper = dealerGroup || u.user_type === "super" || mainSuperusers === 0;
                           const usernameErrorId = `app-username-error-${u.index}`;
                           return (
                             <div
                               className="grid gap-3 rounded-xl border border-line bg-mist/50 p-3.5 md:grid-cols-[1fr_1fr_1fr_auto]"
                               key={u.index}
                             >
+                              {dealerGroup && (
+                                <div className="md:col-span-full">
+                                  <SearchableSelect
+                                    label={t("deviceModel")}
+                                    compact
+                                    value={u.device_model}
+                                    options={Array.from(selectedModels, ([value, label]) => ({ value, label }))}
+                                    onChange={({ value }) => setUserField(u.index, "device_model", value)}
+                                  />
+                                </div>
+                              )}
                               <div>
                                 <label className="mb-1 block text-[12px] font-semibold text-ink-soft">
                                   {t("Username")}
@@ -236,7 +264,7 @@ export default function Step3Users({ data, onChange }) {
                                   value={u.user_type}
                                   options={[
                                     { value: "normal", label: t("userTypeNormal") },
-                                    { value: "super", label: t("userTypeSuper") },
+                                    ...(canSelectSuper ? [{ value: "super", label: t("userTypeSuper") }] : []),
                                   ]}
                                   onChange={({ value }) => setUserField(u.index, "user_type", value)}
                                 />
@@ -270,7 +298,7 @@ export default function Step3Users({ data, onChange }) {
                         })}
                       </div>
 
-                      {group.key !== "__unassigned__" && (
+                      {group.key !== "__unassigned__" && (!dealerGroup || group.users.length === 0) && (
                         <button
                           type="button"
                           disabled={groupReachedLimit}
@@ -281,14 +309,8 @@ export default function Step3Users({ data, onChange }) {
                           onClick={() => addUser(group.key)}
                         >
                           <Icon name="plus" />
-                          {t("addUserFor", { model: group.label })}
+                          {dealerGroup ? t("addDealerAppUser") : t("addUserFor", { model: group.label })}
                         </button>
-                      )}
-                      {groupReachedLimit && (
-                        <p className="mt-2 flex items-center gap-1.5 text-[12px] text-alert">
-                          <Icon name="info-circle" />
-                          {t("userLimitWarning")}
-                        </p>
                       )}
                     </div>
                   )}
