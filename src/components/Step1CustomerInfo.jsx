@@ -302,16 +302,16 @@ export default function Step1CustomerInfo({ data, onChange, editor, onEditorChan
               onChange={set("contact_email")}
             />
           </Field>
-          <div className="grid grid-cols-4 gap-3 md:col-span-2">
-            <Field label={t("dealerName")} required className="col-span-3">
+          <div className="grid gap-3 sm:grid-cols-[minmax(0,3fr)_minmax(14rem,1fr)] md:col-span-2">
+            <Field label={t("dealerName")} required>
               <input className={inputClass} value={data.dealer_name ?? ""} onChange={set("dealer_name")} />
             </Field>
-            <div className="col-span-1 flex flex-col">
+            <div>
               <span className={labelClass}>
                 {t("dealerContact")}
                 <span className="ml-0.5 text-alert">*</span>
               </span>
-              <div className="mt-1.5 flex-1">
+              <div className="mt-1.5">
                 <button
                   type="button"
                   onClick={() => onEditorChange({ type: "dealer", draft: dealerContactDraft(data) })}
@@ -323,7 +323,7 @@ export default function Step1CustomerInfo({ data, onChange, editor, onEditorChan
                 >
                   <Icon name={hasDealerContact ? "circle-check" : "message-circle"} style={{ fontSize: 19 }} className="shrink-0" />
                   <span className="truncate leading-none">
-                    {hasDealerContact ? t("dealerContactConfigured") : t("dealerContact")}
+                    {hasDealerContact ? t("dealerContactConfigured") : t("dealerContactAdd")}
                   </span>
                 </button>
               </div>

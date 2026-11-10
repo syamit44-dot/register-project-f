@@ -112,7 +112,7 @@ export default function DealerContactModal({ draft, onDraftChange, onSave, onClo
               type="email"
               value={draft.dealer_contact_email}
               onChange={set("dealer_contact_email")}
-              placeholder="name@dealer.com"
+              placeholder="name@example.com"
             />
           </Field>
 
