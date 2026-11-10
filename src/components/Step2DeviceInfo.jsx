@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import Icon from "./Icon";
 import SearchableSelect from "./SearchableSelect";
-import { fetchEquipmentModels } from "../api/client";
+import { fetchEquipmentModels, getCachedEquipmentModels, isEquipmentCatalogAuthError } from "../api/client";
 import modelData from "../data/modelData";
 import modelAlarmData from "../data/modelAlarm";
 import modelEggCounterData from "../data/modelEggCounter";
@@ -261,22 +261,51 @@ export default function Step2DeviceInfo({ active, data, onChange, editor, onEdit
   const selectedSilonic = draft?.silonic_models ?? [];
   const copyTargets = editor?.targets ?? [];
   const [showHouseListInfo, setShowHouseListInfo] = useState(false);
-  const [equipmentModels, setEquipmentModels] = useState([]);
+  const [equipmentModels, setEquipmentModels] = useState(getCachedEquipmentModels);
   const [catalogState, setCatalogState] = useState("loading");
+  const [catalogAttempt, setCatalogAttempt] = useState(0);
 
   useEffect(() => {
     if (!active) return;
     let ignore = false;
+    const cached = getCachedEquipmentModels();
+    setEquipmentModels(cached);
     setCatalogState("loading");
     fetchEquipmentModels().then((models) => {
       if (ignore) return;
       setEquipmentModels(models);
       setCatalogState("ready");
-    }).catch(() => {
-      if (!ignore) setCatalogState("error");
+    }).catch((error) => {
+      if (ignore) return;
+      if (isEquipmentCatalogAuthError(error)) {
+        setEquipmentModels(null);
+        setCatalogState("auth-error");
+      } else {
+        setCatalogState(cached ? "stale" : "error");
+      }
     });
     return () => { ignore = true; };
-  }, [active]);
+  }, [active, catalogAttempt]);
+
+  function retryCatalog() {
+    setCatalogAttempt((attempt) => attempt + 1);
+  }
+
+  const catalogMessageKey = {
+    stale: "equipmentCatalogCached",
+    error: "equipmentCatalogError",
+    "auth-error": "equipmentCatalogAuthError",
+  }[catalogState];
+  const catalogNotice = catalogMessageKey && (
+    <div className={`mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-line px-3 py-2 text-[13px] ${catalogState === "stale" ? "text-ink-soft" : "text-alert"}`}>
+      <p role="status">{t(catalogMessageKey)}</p>
+      {catalogState !== "auth-error" && (
+        <button type="button" className="font-semibold text-brand underline" onClick={retryCatalog}>
+          {t("equipmentCatalogRetry")}
+        </button>
+      )}
+    </div>
+  );
 
   const houses = useMemo(() => (data.houses ?? []).map(normalizeHouse), [data.houses]);
   const isBulkEditing = editingIndex === null && draft !== null;
@@ -365,10 +394,10 @@ export default function Step2DeviceInfo({ active, data, onChange, editor, onEdit
   }
 
   function renderModelSelect(category, value, valueLabel, onChange) {
-    const options = equipmentModels
+    const options = (equipmentModels ?? [])
       .filter((model) => model.category === category)
       .map(({ id, code, name }) => ({ id, value: code, label: name, keywords: code }));
-    const placeholder = catalogState === "loading" ? t("loading") : t("selectModelPlaceholder");
+    const placeholder = !equipmentModels && catalogState === "loading" ? t("loading") : t("selectModelPlaceholder");
     return (
       <>
         <SearchableSelect
@@ -379,10 +408,9 @@ export default function Step2DeviceInfo({ active, data, onChange, editor, onEdit
           valueLabel={valueLabel}
           options={value ? [{ value: "", label: t("selectModelPlaceholder") }, ...options] : options}
           onChange={onChange}
-          disabled={catalogState !== "ready" || options.length === 0}
+          disabled={options.length === 0}
         />
-        {catalogState === "error" && <p role="alert" className="mt-1 text-xs text-alert">{t("equipmentCatalogError")}</p>}
-        {catalogState === "ready" && options.length === 0 && <p className="mt-1 text-xs text-ink-soft">{t("equipmentCatalogEmpty")}</p>}
+        {equipmentModels && options.length === 0 && <p className="mt-1 text-xs text-ink-soft">{t("equipmentCatalogEmpty")}</p>}
       </>
     );
   }
@@ -490,6 +518,7 @@ export default function Step2DeviceInfo({ active, data, onChange, editor, onEdit
       </div>
 
       <div className="form-step-body px-7 py-8 sm:px-9 sm:py-9">
+        {!draft && catalogNotice}
         <div className="flex flex-wrap items-center gap-2 border-b border-line pb-3">
           <p className="text-[13px] font-bold uppercase tracking-[0.06em] text-ink-soft">{t("houseList")}</p>
           <button
@@ -618,6 +647,7 @@ export default function Step2DeviceInfo({ active, data, onChange, editor, onEdit
               </div>
 
               <div className="space-y-6 overflow-y-auto px-7 py-7">
+                {catalogNotice}
                 {isBulkEditing && (
                   <fieldset className="rounded-xl border border-line bg-white px-5 pb-4 pt-2">
                     <legend className="px-1 text-sm font-semibold text-ink">{t("copyHouseTargets")}</legend>

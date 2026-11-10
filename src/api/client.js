@@ -2,6 +2,7 @@ import axios from "axios";
 import { getToken, getAuth, updateAccessToken, clearAuth } from "./auth";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000/api";
+const EQUIPMENT_MODELS_CACHE_KEY = `equipment-models:v1:${API_URL}`;
 
 export const api = axios.create({
   baseURL: API_URL,
@@ -210,14 +211,55 @@ function toFarmSummary({ farm, device, alarm, egg, silonic, userapp }, modelName
   };
 }
 
+function isEquipmentCatalog(models) {
+  return Array.isArray(models) && models.every((model) => (
+    Number.isInteger(model?.id) && typeof model.code === "string"
+    && typeof model.name === "string" && typeof model.category === "string"
+  ));
+}
+
+export function getCachedEquipmentModels() {
+  if (!getToken()) return null;
+  try {
+    const models = JSON.parse(localStorage.getItem(EQUIPMENT_MODELS_CACHE_KEY));
+    return isEquipmentCatalog(models) ? models : null;
+  } catch {
+    return null;
+  }
+}
+
+export function isEquipmentCatalogAuthError(error) {
+  return error.response?.status === 401 || error.response?.status === 403;
+}
+
+let equipmentModelsRequest;
+
 export function fetchEquipmentModels() {
-  return api.get("/equipment-models").then((res) => res.data);
+  if (!equipmentModelsRequest) {
+    equipmentModelsRequest = api.get("/equipment-models", { timeout: 10000 }).then(({ data }) => {
+      if (!isEquipmentCatalog(data)) throw new Error("Invalid equipment catalog response.");
+      const models = data.map(({ id, code, name, category }) => ({ id, code, name, category }));
+      try {
+        localStorage.setItem(EQUIPMENT_MODELS_CACHE_KEY, JSON.stringify(models));
+      } catch {
+        // The fetched catalog is usable even if browser storage is unavailable.
+      }
+      return models;
+    }).finally(() => {
+      equipmentModelsRequest = undefined;
+    });
+  }
+  return equipmentModelsRequest;
 }
 
 export async function fetchUserFarms() {
   const { data: farms } = await api.get("/get-farm/user");
   if (farms.length === 0) return [];
-  const models = await fetchEquipmentModels();
+  const models = await fetchEquipmentModels().catch((error) => {
+    const cached = isEquipmentCatalogAuthError(error) ? null : getCachedEquipmentModels();
+    if (!cached) throw error;
+    return cached;
+  });
   const modelNames = new Map(models.map(({ id, name }) => [id, name]));
   return farms.map((farm) => toFarmSummary(farm, modelNames));
 }
