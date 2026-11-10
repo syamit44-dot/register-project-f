@@ -49,12 +49,13 @@ function groupUsersByModel(appUsers, selectedModels) {
   }));
 }
 
-function InfoRow({ label, value, fallback, optional = false, className = "" }) {
+function InfoRow({ label, value, fallback, optional = false, className = "", children }) {
   return (
     <div className={`min-w-0 ${className}`}>
       <dt className="text-xs font-medium text-ink-soft">{label}</dt>
       <dd className="mt-0.5 break-words text-sm text-ink">
         {value || <span className={optional ? "text-ink-soft" : "text-alert"}>{fallback}</span>}
+        {children}
       </dd>
     </div>
   );
@@ -229,7 +230,6 @@ export default function Step4Confirm({ data, onChange, onGoTo }) {
               <InfoRow label={t("numberOfHouses")} value={`${data.house_count} ${t("house")}${Number(data.house_count) > 1 ? "s" : ""}`} fallback={t("notProvided")} />
               <InfoRow label={t("timezone")} value={data.timezone} fallback={t("notProvided")} />
               <InfoRow label={t("address")} value={fullAddress} fallback={t("notProvided")} className="lg:col-span-2" />
-              <InfoRow label={t("invitationKey")} value={data.invitation_key} fallback={t("notSpecified")} optional />
             </dl>
             <h4 className="mb-2 mt-3 border-t border-line pt-2.5 text-xs font-bold text-ink">{t("contactTitle")}</h4>
             <dl className="grid gap-x-4 gap-y-2.5 sm:grid-cols-2 lg:grid-cols-3">
@@ -265,15 +265,19 @@ export default function Step4Confirm({ data, onChange, onGoTo }) {
                               ? ALARM_OPTIONS.find(({ key }) => key === item?.key)?.label ?? item?.key
                               : modelData[item?.model]?.name ?? item?.model);
                           return (
-                            <li key={group.models} className="grid gap-x-4 gap-y-1.5 py-2 sm:grid-cols-[minmax(7rem,1fr)_3fr]">
-                              <p className="pt-0.5 text-[13px] font-semibold text-ink">{t(group.label)}</p>
-                              <dl className="grid grid-cols-2 gap-x-3 gap-y-1.5 sm:grid-cols-3">
+                            <li key={group.models} className="grid gap-x-4 gap-y-2 py-2.5 sm:grid-cols-[minmax(7rem,1fr)_3fr] sm:items-center">
+                              <p className="text-[13px] font-semibold text-ink">{t(group.label)}</p>
+                              <dl className="grid min-w-0 grid-cols-2 items-center gap-x-3 gap-y-2 sm:grid-cols-3 sm:text-center">
                                 <InfoRow label={t("model")} value={model} fallback={t("notProvided")} />
                                 <InfoRow label={t("serialNumber")} value={item?.serial_number?.trim()} fallback={t("notProvided")} />
-                                <InfoRow label={t("communication")} value={summarizeCommunication(communication, t)} fallback={t("notProvided")} />
-                                {group.models === "device_models" && communication?.smartlink && (
-                                  <InfoRow label={t("smartlinkSnLabel")} value={house.smartlink_serial_number?.trim()} fallback={t("notProvided")} className="sm:col-start-3" />
-                                )}
+                                <InfoRow label={t("communication")} value={summarizeCommunication(communication, t)} fallback={t("notProvided")}>
+                                  {group.models === "device_models" && communication?.smartlink && (
+                                    <span className="mt-1.5 block">
+                                      <span className="block text-xs font-medium text-ink-soft">{t("smartlinkSnLabel")}</span>
+                                      {house.smartlink_serial_number?.trim() || <span className="text-alert">{t("notProvided")}</span>}
+                                    </span>
+                                  )}
+                                </InfoRow>
                               </dl>
                             </li>
                           );

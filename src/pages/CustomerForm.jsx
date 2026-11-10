@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { useBlocker, useLocation, useNavigate } from "react-router-dom";
+import { useBlocker, useNavigate } from "react-router-dom";
 import { AppShellStyles, SidebarNav, SignOutModal } from "../components/AppShell";
 import { clearAuth, getAuth } from "../api/auth";
 import StepRail from "../components/StepRail";
@@ -33,7 +33,6 @@ const initialData = {
   dealer_contact_email: "",
   dealer_contact_other_label: "",
   dealer_contact_other_value: "",
-  invitation_key: "",
   platform: "",
   device_model: "",
   houses: [{ name: "House 1", serial_number: "" }],
@@ -143,14 +142,14 @@ function StepFooter({ onBack, onNext, nextLabel, nextIcon = "arrow-right", nextD
 
 export default function CustomerForm() {
   const navigate = useNavigate();
-  const location = useLocation();
   const { t } = useLanguage();
   const [scope] = useState(draftStorageScope);
   const [restored] = useState(() => readDraft(scope));
   const [current, setCurrent] = useState(() => [0, 1, 2, 3].includes(restored?.step) ? restored.step : 0);
   const [data, setData] = useState(() => {
-    const params = new URLSearchParams(location.search);
-    return { ...initialData, ...restored?.data, invitation_key: params.get("invitation_key") || "" };
+    const restoredData = { ...restored?.data };
+    delete restoredData.invitation_key;
+    return { ...initialData, ...restoredData };
   });
   const [editor, setEditor] = useState(restored?.editor ?? null);
   const [draftSaved, setDraftSaved] = useState(true);
@@ -160,8 +159,7 @@ export default function CustomerForm() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [signOutConfirmOpen, setSignOutConfirmOpen] = useState(false);
   const leavingViaSignOut = useRef(false);
-  const draftData = { ...data, invitation_key: "" };
-  const hasDraft = !done && (editor?.dirty || JSON.stringify(draftData) !== emptyDraftData);
+  const hasDraft = !done && (editor?.dirty || JSON.stringify(data) !== emptyDraftData);
   const blocker = useBlocker(({ currentLocation, nextLocation }) => (
     Boolean(hasDraft) && !leavingViaSignOut.current
     && (currentLocation.pathname !== nextLocation.pathname || currentLocation.search !== nextLocation.search)
@@ -171,8 +169,7 @@ export default function CustomerForm() {
     try {
       const storage = window[scope.storage];
       if (hasDraft) {
-        const dataToStore = { ...data, invitation_key: "" };
-        storage.setItem(scope.key, JSON.stringify({ data: dataToStore, step: current, editor }));
+        storage.setItem(scope.key, JSON.stringify({ data, step: current, editor }));
       } else {
         storage.removeItem(scope.key);
       }
@@ -191,12 +188,6 @@ export default function CustomerForm() {
     window.addEventListener("beforeunload", beforeUnload);
     return () => window.removeEventListener("beforeunload", beforeUnload);
   }, [hasDraft]);
-
-  useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    const invitationKey = params.get("invitation_key") || "";
-    setData((prev) => (prev.invitation_key === invitationKey ? prev : { ...prev, invitation_key: invitationKey }));
-  }, [location.search]);
 
   function next() {
     if (current < 3) setCurrent(current + 1);

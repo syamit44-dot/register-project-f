@@ -1018,11 +1018,12 @@ export default function Landing() {
                       <div className={`auth-stagger-2 auth-form-section auth-verify-form ${authMode === "Sign Up" && signupStep === "verify" ? "block" : "hidden"}`}>
                         <p className="mb-4 text-[15px] leading-6 text-slate-500">{t("identityVerificationDesc")}</p>
                         <div className="mb-2">
-                          <label className="mb-1.5 block text-[15px] font-medium text-gray-600">
+                          <label htmlFor="signup-verification-code" className="mb-1.5 block text-[15px] font-medium text-gray-600">
                             {t("InvitationKey")}<span className="ml-0.5 text-red-700">*</span>
                           </label>
                           <input
-                            type="text"
+                            type="password"
+                            id="signup-verification-code" autoComplete="off"
                             value={invitationKey}
                             onChange={(e) => {
                               setInvitationKey(e.target.value);

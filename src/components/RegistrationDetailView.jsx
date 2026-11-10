@@ -102,10 +102,9 @@ export default function RegistrationDetailView({ data, editable = false, draft =
       )}
 
       <SectionCard title={t("farmInfoAddressTitle")}>
-        <div className="grid grid-cols-2 gap-x-4 gap-y-5 text-base sm:grid-cols-[1.7fr_1fr_1fr_1fr]">
+        <div className="grid grid-cols-2 gap-x-4 gap-y-5 text-base sm:grid-cols-[1.7fr_1fr_1fr]">
           {F(t("farmNameCompany"), "farm_name", false, "text", "text-sm uppercase tracking-[0.05em] text-ink-soft")}
           {F(t("companyName"), "farm_short", false, "text", "text-sm uppercase tracking-[0.05em] text-ink-soft")}
-          {F(t("invitationKey"), "invitation_key", false, "text", "text-sm uppercase tracking-[0.05em] text-ink-soft")}
           {F(t("numberOfHouses"), "house_count", false, "number", "text-sm uppercase tracking-[0.05em] text-ink-soft")}
         </div>
 
