@@ -2,10 +2,11 @@ import { useEffect, useId, useState } from "react";
 import Icon from "./Icon";
 import { useLanguage } from "../i18n.jsx";
 
-export default function SearchableSelect({ label, required, value, options, onChange, placeholder, disabled, valueLabel, compact = false }) {
+export default function SearchableSelect({ label, required, value, options, onChange, placeholder, disabled, valueLabel, compact = false, error }) {
   const { t } = useLanguage();
   const inputId = useId();
   const listId = `${inputId}-list`;
+  const errorId = `${inputId}-error`;
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState(null);
   const [highlight, setHighlight] = useState(-1);
@@ -69,6 +70,8 @@ export default function SearchableSelect({ label, required, value, options, onCh
           aria-controls={open ? listId : undefined}
           aria-activedescendant={open && matches[highlight] ? `${listId}-${highlight}` : undefined}
           aria-required={required}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error ? errorId : undefined}
           autoComplete="off"
           disabled={disabled}
           value={open ? query ?? selectedLabel : selectedLabel}
@@ -94,7 +97,9 @@ export default function SearchableSelect({ label, required, value, options, onCh
             setHighlight(-1);
             setOpen(true);
           }}
-          className={`w-full rounded-xl border border-line-strong bg-white py-2 pr-9 text-ink shadow-sm outline-none transition hover:border-brand/50 focus:border-brand focus:ring-4 focus:ring-brand-tint disabled:bg-mist disabled:text-ink-soft ${
+          className={`w-full rounded-xl border bg-white py-2 pr-9 text-ink shadow-sm outline-none transition focus:ring-4 disabled:bg-mist disabled:text-ink-soft ${
+            error ? "border-alert focus:ring-alert-tint" : "border-line-strong hover:border-brand/50 focus:border-brand focus:ring-brand-tint"
+          } ${
             compact ? "h-10 pl-3 text-sm" : "h-11 pl-3.5 text-[13.5px]"
           }`}
         />
@@ -118,6 +123,7 @@ export default function SearchableSelect({ label, required, value, options, onCh
           </ul>
         )}
       </div>
+      {error && <p id={errorId} className="mt-1.5 text-[13px] font-medium text-alert">{error}</p>}
     </div>
   );
 }

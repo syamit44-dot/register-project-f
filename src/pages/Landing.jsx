@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from "react";
 import { signUp, signIn, checkAccessKey, scheduleTokenRefresh } from "../api/client";
 import { saveAuth } from "../api/auth";
 import CaptchaField from "../components/CaptchaField";
+import SearchableSelect from "../components/SearchableSelect";
 import { useLanguage } from "../i18n.jsx";
 import countryData from "../data/countryData";
 import heroSlide1 from "../assets/images/landing1.jpg";
@@ -1214,27 +1215,21 @@ export default function Landing() {
                             </div>
                           )}
                           {authMode === "Sign Up" && (
-                            <div>
-                              <label htmlFor="auth-account-type" className="mb-1.5 block text-[15px] font-medium text-gray-600">
-                                {t("signupAccountType")}<span className="ml-0.5 text-red-700">*</span>
-                              </label>
-                              <select
-                                id="auth-account-type"
-                                value={accountType}
-                                required
-                                aria-invalid={Boolean(fieldErrors.accountType)}
-                                className={`auth-input ${fieldErrors.accountType ? "auth-input-error" : ""}`}
-                                onChange={(e) => {
-                                  setAccountType(e.target.value);
-                                  setFieldErrors((prev) => ({ ...prev, accountType: undefined }));
-                                }}
-                              >
-                                <option value="" disabled>{t("signupAccountTypeRequired")}</option>
-                                <option value="customer">{t("signupCustomerType")}</option>
-                                <option value="dealer">{t("signupDealerType")}</option>
-                              </select>
-                              {fieldErrors.accountType && <p className="mt-1.5 text-[13px] font-medium text-red-600">{fieldErrors.accountType}</p>}
-                            </div>
+                            <SearchableSelect
+                              label={t("signupAccountType")}
+                              required
+                              value={accountType}
+                              placeholder={t("signupAccountTypeRequired")}
+                              error={fieldErrors.accountType}
+                              options={[
+                                { value: "customer", label: t("signupCustomerType") },
+                                { value: "dealer", label: t("signupDealerType") },
+                              ]}
+                              onChange={({ value }) => {
+                                setAccountType(value);
+                                setFieldErrors((prev) => ({ ...prev, accountType: undefined }));
+                              }}
+                            />
                           )}
                         </div>
                         <div className="mb-4">
