@@ -288,9 +288,9 @@ export default function CustomerForm() {
                     </div>
                   </div>
 
-                  {hasDraft && (
-                    <p className={`border-b border-line px-7 py-2.5 text-[12px] sm:px-9 ${draftSaved ? "text-ink-soft" : "text-alert"}`}>
-                      {t(draftSaved ? "registrationDraftSaved" : "registrationDraftUnavailable")}
+                  {hasDraft && !draftSaved && (
+                    <p role="alert" className="border-b border-line px-7 py-2.5 text-[12px] text-alert sm:px-9">
+                      {t("registrationDraftUnavailable")}
                     </p>
                   )}
 
