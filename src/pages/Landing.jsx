@@ -1309,6 +1309,18 @@ export default function Landing() {
                             ? authLoading ? t("signingIn") : t("signIn")
                             : authLoading ? t("signingUp") : t("signUp")}
                         </button>
+                        {page !== "admin" && authMode === "Sign In" && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setAuthMode("Sign Up");
+                              handleClearData();
+                            }}
+                            className="mt-3 flex min-h-12 w-full items-center justify-center rounded-xl border border-line-strong bg-white px-4 py-3 text-[16px] font-semibold text-brand transition hover:border-brand hover:bg-brand-tint focus-visible:outline-brand"
+                          >
+                            {t("signUp")}
+                          </button>
+                        )}
                       </form>
                       {!(authMode === "Sign Up" && signupStep === "account") && (
                         <div className="auth-footer-hint">
@@ -1317,17 +1329,17 @@ export default function Landing() {
                             : "Your information is securely handled by the registration system."}
                         </div>
                       )}
-                      {page !== "admin" && (
+                      {page !== "admin" && authMode === "Sign Up" && (
                         <div className="mt-4 text-center">
                           <button
                             type="button"
                             onClick={() => {
-                              setAuthMode(authMode === "Sign In" ? "Sign Up" : "Sign In");
+                              setAuthMode("Sign In");
                               handleClearData();
                             }}
                             className="text-[14px] text-slate-400 transition hover:text-blue-700"
                           >
-                            {authMode === "Sign In" ? t("dontHaveAccount") : t("alreadyHaveAccount")}
+                            {t("alreadyHaveAccount")}
                           </button>
                         </div>
                       )}
