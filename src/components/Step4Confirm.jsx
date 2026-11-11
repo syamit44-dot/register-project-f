@@ -311,7 +311,7 @@ export default function Step4Confirm({ data, onChange, onGoTo }) {
                             <InfoRow label={t("email")} value={user.email?.trim()} fallback={t("notSpecified")} optional />
                             <InfoRow
                               label={t("UserType")}
-                              value={`${t(USER_TYPE_KEYS[user.user_type] ?? "userTypeNormal")}${user.is_dealer ? " Distributor" : ""}`}
+                              value={t(USER_TYPE_KEYS[user.user_type] ?? "userTypeNormal")}
                             />
                           </dl>
                         </li>
