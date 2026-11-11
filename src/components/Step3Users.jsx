@@ -165,6 +165,8 @@ export default function Step3Users({ data, onChange, isDealer, allowModelChange 
               const isCollapsed = collapsedGroups.has(group.key);
               const counts = appUserCounts(group.users);
               const assigned = group.key !== UNASSIGNED;
+              const canAddMain = counts.main < MAIN_APP_USERS_PER_MODEL;
+              const canAddDistributor = isDealer && counts.distributors === 0;
 
               return (
                 <div key={group.key} className="user-group-panel rounded-xl border border-slate-200 bg-white shadow-[0_2px_8px_rgba(22,35,61,0.035)]">
@@ -288,18 +290,19 @@ export default function Step3Users({ data, onChange, isDealer, allowModelChange 
                         })}
                       </div>
 
-                      {assigned && (
+                      {assigned && (canAddMain || canAddDistributor) && (
                         <div className="mt-3 flex flex-wrap gap-2">
-                          <button
-                            type="button"
-                            disabled={counts.main >= MAIN_APP_USERS_PER_MODEL}
-                            className="inline-flex items-center gap-2 rounded-xl border border-line-strong bg-white px-4 py-2 text-sm text-ink transition enabled:hover:border-brand-dark enabled:hover:bg-brand-tint disabled:cursor-not-allowed disabled:bg-line disabled:text-ink-soft"
-                            onClick={() => addUser(group, false)}
-                          >
-                            <Icon name="plus" />
-                            {t("addUserFor", { model: group.label })}
-                          </button>
-                          {isDealer && counts.distributors === 0 && (
+                          {canAddMain && (
+                            <button
+                              type="button"
+                              className="inline-flex items-center gap-2 rounded-xl border border-line-strong bg-white px-4 py-2 text-sm text-ink transition hover:border-brand-dark hover:bg-brand-tint"
+                              onClick={() => addUser(group, false)}
+                            >
+                              <Icon name="plus" />
+                              {t("addUserFor", { model: group.label })}
+                            </button>
+                          )}
+                          {canAddDistributor && (
                             <button
                               type="button"
                               className="inline-flex items-center gap-2 rounded-xl border border-line-strong bg-white px-4 py-2 text-sm text-ink transition hover:border-brand-dark hover:bg-brand-tint"
