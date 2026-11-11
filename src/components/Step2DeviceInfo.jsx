@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import Icon from "./Icon";
 import SearchableSelect from "./SearchableSelect";
-import { fetchEquipmentModels, getCachedEquipmentModels, isEquipmentCatalogAuthError } from "../api/client";
+import { fetchEquipmentModels, isEquipmentCatalogAuthError } from "../api/client";
 import modelData from "../data/modelData";
 import modelAlarmData from "../data/modelAlarm";
 import modelEggCounterData from "../data/modelEggCounter";
@@ -261,30 +261,24 @@ export default function Step2DeviceInfo({ active, data, onChange, editor, onEdit
   const selectedSilonic = draft?.silonic_models ?? [];
   const copyTargets = editor?.targets ?? [];
   const [showHouseListInfo, setShowHouseListInfo] = useState(false);
-  const [equipmentModels, setEquipmentModels] = useState(getCachedEquipmentModels);
+  const [equipmentModels, setEquipmentModels] = useState(null);
   const [catalogState, setCatalogState] = useState("loading");
   const [catalogAttempt, setCatalogAttempt] = useState(0);
 
   useEffect(() => {
-    if (!active) return;
-    let ignore = false;
-    const cached = getCachedEquipmentModels();
-    setEquipmentModels(cached);
+    setEquipmentModels(null);
     setCatalogState("loading");
-    fetchEquipmentModels().then((models) => {
-      if (ignore) return;
+    if (!active) return;
+    const controller = new AbortController();
+    fetchEquipmentModels(controller.signal).then((models) => {
+      if (controller.signal.aborted) return;
       setEquipmentModels(models);
       setCatalogState("ready");
     }).catch((error) => {
-      if (ignore) return;
-      if (isEquipmentCatalogAuthError(error)) {
-        setEquipmentModels(null);
-        setCatalogState("auth-error");
-      } else {
-        setCatalogState(cached ? "stale" : "error");
-      }
+      if (controller.signal.aborted) return;
+      setCatalogState(isEquipmentCatalogAuthError(error) ? "auth-error" : "error");
     });
-    return () => { ignore = true; };
+    return () => controller.abort();
   }, [active, catalogAttempt]);
 
   function retryCatalog() {
@@ -292,12 +286,11 @@ export default function Step2DeviceInfo({ active, data, onChange, editor, onEdit
   }
 
   const catalogMessageKey = {
-    stale: "equipmentCatalogCached",
     error: "equipmentCatalogError",
     "auth-error": "equipmentCatalogAuthError",
   }[catalogState];
   const catalogNotice = catalogMessageKey && (
-    <div className={`mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-line px-3 py-2 text-[13px] ${catalogState === "stale" ? "text-ink-soft" : "text-alert"}`}>
+    <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-line px-3 py-2 text-[13px] text-alert">
       <p role="status">{t(catalogMessageKey)}</p>
       {catalogState !== "auth-error" && (
         <button type="button" className="font-semibold text-brand underline" onClick={retryCatalog}>
