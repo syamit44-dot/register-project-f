@@ -69,6 +69,10 @@ export function registrationFormData(registration, catalog) {
   };
 }
 
+export function compareAppUserRole(a, b) {
+  return Number(Boolean(b.is_dealer)) - Number(Boolean(a.is_dealer));
+}
+
 export function getSelectedAppModels(houses) {
   const models = new Map();
   for (const house of houses ?? []) {

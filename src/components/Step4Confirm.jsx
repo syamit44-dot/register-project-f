@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Icon from "./Icon";
 import modelData from "../data/modelData";
-import { getSelectedAppModels } from "../utils/registrationModels";
+import { compareAppUserRole, getSelectedAppModels } from "../utils/registrationModels";
 import { useLanguage } from "../i18n.jsx";
 
 const USER_TYPE_KEYS = { normal: "userTypeNormal", super: "userTypeSuper" };
@@ -45,7 +45,7 @@ function groupUsersByModel(appUsers, selectedModels) {
   return Array.from(selectedModels, ([key, label]) => ({
     key,
     label,
-    users: appUsers.filter((u) => u.device_model === key),
+    users: appUsers.filter((u) => u.device_model === key).sort(compareAppUserRole),
   }));
 }
 

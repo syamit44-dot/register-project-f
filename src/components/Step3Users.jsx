@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import Icon from "./Icon";
 import SearchableSelect from "./SearchableSelect";
-import { getSelectedAppModels } from "../utils/registrationModels";
+import { compareAppUserRole, getSelectedAppModels } from "../utils/registrationModels";
 import { APP_USERNAME_MAX_LENGTH, MAIN_APP_USERS_PER_MODEL, appUserCounts, isValidAppUsername, sanitizeAppUsername } from "../utils/registrationPayload";
 import { useLanguage } from "../i18n.jsx";
 
@@ -23,7 +23,9 @@ export default function Step3Users({ data, onChange, isDealer, allowModelChange 
       const group = groups.get(user.device_model) ?? unassigned;
       group.users.push({ ...user, index });
     });
-    return [...groups.values(), ...(unassigned.users.length ? [unassigned] : [])];
+    const visible = [...groups.values(), ...(unassigned.users.length ? [unassigned] : [])];
+    for (const group of visible) group.users.sort(compareAppUserRole);
+    return visible;
   }, [data.app_users, selectedModels, t]);
 
   function modelOptions(user) {
