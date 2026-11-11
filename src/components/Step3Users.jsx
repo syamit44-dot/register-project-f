@@ -2,10 +2,10 @@ import { useMemo, useState } from "react";
 import Icon from "./Icon";
 import SearchableSelect from "./SearchableSelect";
 import { getSelectedAppModels } from "../utils/registrationModels";
-import { APP_USERNAME_MAX_LENGTH, FARM_APP_USER_LIMIT, isValidAppUsername, sanitizeAppUsername } from "../utils/registrationPayload";
+import { APP_USERNAME_MAX_LENGTH, MAIN_APP_USERS_PER_MODEL, appUserCounts, isValidAppUsername, sanitizeAppUsername } from "../utils/registrationPayload";
 import { useLanguage } from "../i18n.jsx";
 
-const DEALER_GROUP = "__dealer__";
+const UNASSIGNED = "__unassigned__";
 
 export default function Step3Users({ data, onChange, isDealer, allowModelChange = false }) {
   const { t } = useLanguage();
@@ -16,45 +16,27 @@ export default function Step3Users({ data, onChange, isDealer, allowModelChange 
 
   const selectedModels = useMemo(() => getSelectedAppModels(data.houses), [data.houses]);
 
-  const mainUsers = data.app_users.filter((user) => !user.is_dealer);
-  const mainLimitReached = mainUsers.length >= FARM_APP_USER_LIMIT;
-  const mainSuperusers = mainUsers.filter((user) => user.user_type === "super").length;
+  const visibleGroups = useMemo(() => {
+    const groups = new Map(Array.from(selectedModels, ([key, label]) => [key, { key, label, users: [] }]));
+    const unassigned = { key: UNASSIGNED, label: t("unassignedGroup"), users: [] };
+    data.app_users.forEach((user, index) => {
+      const group = groups.get(user.device_model) ?? unassigned;
+      group.users.push({ ...user, index });
+    });
+    return [...groups.values(), ...(unassigned.users.length ? [unassigned] : [])];
+  }, [data.app_users, selectedModels, t]);
 
-  // จัดกลุ่ม app_users ตาม device_model — คนที่ไม่มี device_model หรือ device_model
-  // ไม่ตรงกับรุ่นที่เลือกไว้ในตอนนี้ (เช่น ลบรุ่นออกจาก Step 2 ไปแล้ว) จะตกไปกลุ่ม "ทั่วไป"
-  const groups = useMemo(() => {
-    const modelGroups = Array.from(selectedModels, ([key, label]) => ({
-      key,
-      label,
-      users: data.app_users
-        .map((u, index) => ({ ...u, index }))
-        .filter((u) => !u.is_dealer && u.device_model === key),
-    }));
-
-    const unassigned = data.app_users
-      .map((u, index) => ({ ...u, index }))
-      .filter((u) => !u.is_dealer && !selectedModels.has(u.device_model));
-
-    const dealerUsers = data.app_users.map((u, index) => ({ ...u, index })).filter((u) => u.is_dealer);
-    const dealerGroup = isDealer && (selectedModels.size > 0 || dealerUsers.length > 0)
-      ? [{ key: DEALER_GROUP, label: t("dealerAppUser"), users: dealerUsers }]
-      : [];
-
-    return [
-      ...modelGroups,
-      { key: "__unassigned__", label: t("unassignedGroup"), users: unassigned },
-      ...dealerGroup,
-    ];
-  }, [data.app_users, selectedModels, isDealer, t]);
-
-  // Keep orphaned users visible so they can be removed after a controller is changed.
-  const visibleGroups = useMemo(
-    () =>
-      groups.filter(
-          (group) => group.key !== "__unassigned__" || group.users.length > 0
-      ),
-    [groups]
-  );
+  function modelOptions(user) {
+    return visibleGroups
+      .filter((group) => {
+        if (group.key === UNASSIGNED) return false;
+        if (group.key === user.device_model) return true;
+        const counts = appUserCounts(group.users);
+        if (user.is_dealer) return isDealer && counts.distributors === 0;
+        return counts.main < MAIN_APP_USERS_PER_MODEL && (user.user_type !== "super" || counts.superusers === 0);
+      })
+      .map(({ key, label }) => ({ value: key, label }));
+  }
 
   const allCollapsed =
     visibleGroups.length > 0 && visibleGroups.every((g) => collapsedGroups.has(g.key));
@@ -76,9 +58,10 @@ export default function Step3Users({ data, onChange, isDealer, allowModelChange 
     }
   }
 
-  function addUser(groupKey) {
-    const isDealerUser = groupKey === DEALER_GROUP;
-    if (isDealerUser ? !isDealer || !selectedModels.size || data.app_users.some((u) => u.is_dealer) : mainLimitReached) return;
+  function addUser(group, isDealerUser) {
+    const counts = appUserCounts(group.users);
+    if (isDealerUser ? !isDealer || counts.distributors > 0 : counts.main >= MAIN_APP_USERS_PER_MODEL) return;
+    const groupKey = group.key;
 
     // เพิ่ม user ใหม่แล้วขยายกลุ่มนั้นให้เห็นแถวที่เพิ่งเพิ่มทันที
     setCollapsedGroups((prev) => {
@@ -96,7 +79,7 @@ export default function Step3Users({ data, onChange, isDealer, allowModelChange 
           username: "",
           email: "",
           user_type: "normal",
-          device_model: isDealerUser ? selectedModels.keys().next().value : groupKey,
+          device_model: groupKey,
           is_dealer: isDealerUser,
         },
       ],
@@ -166,10 +149,7 @@ export default function Step3Users({ data, onChange, isDealer, allowModelChange 
           </div>
         )}
 
-        <p className="mt-3 text-sm text-ink-soft">{t("appUserLimits", { count: mainUsers.length })}</p>
-        {mainUsers.length > FARM_APP_USER_LIMIT && <p role="alert" className="mt-1 text-sm text-alert">{t("userLimitWarning")}</p>}
-        {mainSuperusers > 1 && <p role="alert" className="mt-1 text-sm text-alert">{t("appSuperuserLimit")}</p>}
-        {isDealer && <p className="mt-1 text-sm text-ink-soft">{t("dealerAppUserLimit")}</p>}
+        {isDealer && <p className="mt-3 text-sm text-ink-soft">{t("dealerAppUserLimit")}</p>}
         <div className="mt-4 space-y-4">
           {visibleGroups.length === 0 ? (
             // ยังไม่ได้เลือกรุ่นเครื่องใน Step 2 เลย — ไม่ต้องโชว์ฟอร์มกรอกผู้ใช้
@@ -181,8 +161,8 @@ export default function Step3Users({ data, onChange, isDealer, allowModelChange 
           ) : (
             visibleGroups.map((group) => {
               const isCollapsed = collapsedGroups.has(group.key);
-              const dealerGroup = group.key === DEALER_GROUP;
-              const groupReachedLimit = dealerGroup ? group.users.length > 0 || !selectedModels.size : mainLimitReached;
+              const counts = appUserCounts(group.users);
+              const assigned = group.key !== UNASSIGNED;
 
               return (
                 <div key={group.key} className="user-group-panel rounded-xl border border-slate-200 bg-white shadow-[0_2px_8px_rgba(22,35,61,0.035)]">
@@ -209,23 +189,31 @@ export default function Step3Users({ data, onChange, isDealer, allowModelChange 
 
                   {!isCollapsed && (
                     <div className="border-t border-line p-4 pt-4 sm:px-5">
+                      {assigned && <p className="mb-3 text-sm text-ink-soft">{t("appUserLimits", { count: counts.main })}</p>}
+                      {assigned && counts.main > MAIN_APP_USERS_PER_MODEL && <p role="alert" className="mb-2 text-sm text-alert">{t("userLimitWarning")}</p>}
+                      {assigned && counts.superusers > 1 && <p role="alert" className="mb-2 text-sm text-alert">{t("appSuperuserLimit")}</p>}
                       <div className="space-y-2">
                         {group.users.map((u) => {
                           const invalidUsername = Boolean(u.username) && u.username !== u.original_username && !isValidAppUsername(u.username);
-                          const canSelectSuper = dealerGroup || u.user_type === "super" || mainSuperusers === 0;
+                          const canSelectSuper = u.is_dealer || u.user_type === "super" || counts.superusers === 0;
                           const usernameErrorId = `app-username-error-${u.index}`;
                           return (
                             <div
                               className="grid gap-3 rounded-xl border border-line bg-mist/50 p-3.5 md:grid-cols-[1fr_1fr_1fr_auto]"
                               key={u.index}
                             >
-                              {(allowModelChange || dealerGroup || group.key === "__unassigned__") && (
+                              {u.is_dealer && (
+                                <div className="md:col-span-full">
+                                  <span className="pill pill-brand">{t("dealerAppUser")}</span>
+                                </div>
+                              )}
+                              {(allowModelChange || !assigned) && (
                                 <div className="md:col-span-full">
                                   <SearchableSelect
                                     label={t("deviceModel")}
                                     compact
                                     value={u.device_model}
-                                    options={Array.from(selectedModels, ([value, label]) => ({ value, label }))}
+                                    options={modelOptions(u)}
                                     onChange={({ value }) => setUserField(u.index, "device_model", value)}
                                   />
                                 </div>
@@ -298,19 +286,28 @@ export default function Step3Users({ data, onChange, isDealer, allowModelChange 
                         })}
                       </div>
 
-                      {group.key !== "__unassigned__" && (!dealerGroup || group.users.length === 0) && (
-                        <button
-                          type="button"
-                          disabled={groupReachedLimit}
-                          className={`mt-3 inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm transition ${groupReachedLimit
-                            ? "cursor-not-allowed border-line-strong bg-line text-ink-soft"
-                            : "border-line-strong bg-white text-ink hover:border-brand-dark hover:bg-brand-tint"
-                            }`}
-                          onClick={() => addUser(group.key)}
-                        >
-                          <Icon name="plus" />
-                          {dealerGroup ? t("addDealerAppUser") : t("addUserFor", { model: group.label })}
-                        </button>
+                      {assigned && (
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            disabled={counts.main >= MAIN_APP_USERS_PER_MODEL}
+                            className="inline-flex items-center gap-2 rounded-xl border border-line-strong bg-white px-4 py-2 text-sm text-ink transition enabled:hover:border-brand-dark enabled:hover:bg-brand-tint disabled:cursor-not-allowed disabled:bg-line disabled:text-ink-soft"
+                            onClick={() => addUser(group, false)}
+                          >
+                            <Icon name="plus" />
+                            {t("addUserFor", { model: group.label })}
+                          </button>
+                          {isDealer && counts.distributors === 0 && (
+                            <button
+                              type="button"
+                              className="inline-flex items-center gap-2 rounded-xl border border-line-strong bg-white px-4 py-2 text-sm text-ink transition hover:border-brand-dark hover:bg-brand-tint"
+                              onClick={() => addUser(group, true)}
+                            >
+                              <Icon name="plus" />
+                              {t("addDealerAppUser")}
+                            </button>
+                          )}
+                        </div>
                       )}
                     </div>
                   )}

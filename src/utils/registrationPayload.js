@@ -19,7 +19,16 @@ export function sanitizeAppUsername(value) {
   return (farm.length ? `${name}@${farm.join("")}` : name).slice(0, APP_USERNAME_MAX_LENGTH);
 }
 
-export const FARM_APP_USER_LIMIT = 5;
+export const MAIN_APP_USERS_PER_MODEL = 5;
+
+export function appUserCounts(users) {
+  const main = users.filter((user) => !user.is_dealer);
+  return {
+    main: main.length,
+    superusers: main.filter((user) => user.user_type === "super").length,
+    distributors: users.length - main.length,
+  };
+}
 
 export function registrationPayload(data, t, isDealer = false, original = null) {
   const equipment = { device: [], alarm: [], silonic: [], egg: [] };
@@ -62,19 +71,27 @@ export function registrationPayload(data, t, isDealer = false, original = null) 
 
   const farmName = data.farm_name.trim();
   const appUsers = data.app_users.filter((user) => user.device_model || user.email || user.username !== "default1234");
-  const mainUsers = appUsers.filter((user) => !user.is_dealer);
-  const dealerCount = appUsers.length - mainUsers.length;
-  const originalMain = original?.app_users.filter((user) => !user.is_dealer) ?? [];
-  if (mainUsers.length > Math.max(FARM_APP_USER_LIMIT, originalMain.length)) throw new RegistrationInputError(t("userLimitWarning"));
-  const originalSuperusers = originalMain.filter((user) => user.user_type === "super").length;
-  if (mainUsers.filter((user) => user.user_type === "super").length > Math.max(1, originalSuperusers)) {
-    throw new RegistrationInputError(t("appSuperuserLimit"));
+  const usersByModel = new Map();
+  for (const user of appUsers) {
+    const model = String(user.device_model ?? "");
+    if (!usersByModel.has(model)) usersByModel.set(model, []);
+    usersByModel.get(model).push(user);
   }
-  if (dealerCount > Number(isDealer)) throw new RegistrationInputError(t("dealerAppUserLimit"));
+  for (const [model, users] of usersByModel) {
+    if (!appModelIds.has(model)) throw new RegistrationInputError(t("registrationUserNeedsController"));
+    const counts = appUserCounts(users);
+    const previous = appUserCounts(original?.app_users.filter((user) => String(user.device_model) === model) ?? []);
+    if (counts.main > Math.max(MAIN_APP_USERS_PER_MODEL, previous.main)) {
+      throw new RegistrationInputError(t("userLimitWarning"));
+    }
+    if (counts.superusers > Math.max(1, previous.superusers)) {
+      throw new RegistrationInputError(t("appSuperuserLimit"));
+    }
+    if (counts.distributors > Number(isDealer)) throw new RegistrationInputError(t("dealerAppUserLimit"));
+  }
 
   const userapp = appUsers.map((user) => {
     const model = String(user.device_model ?? "");
-    if (!appModelIds.has(model)) throw new RegistrationInputError(t("registrationUserNeedsController"));
     const previous = original?.app_users.find((item) => item.id === user.id || (!user.id && item.username === user.username));
     if (previous?.username !== user.username && !isValidAppUsername(user.username)) {
       throw new RegistrationInputError(t("registrationAppUsernameInvalid"));

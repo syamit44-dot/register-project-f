@@ -265,6 +265,7 @@ export default function Step2DeviceInfo({ active, data, onChange, editor, onEdit
   const selectedSilonic = draft?.silonic_models ?? [];
   const copyTargets = editor?.targets ?? [];
   const [showHouseListInfo, setShowHouseListInfo] = useState(false);
+  const [communicationHelp, setCommunicationHelp] = useState(null);
   const [equipmentModels, setEquipmentModels] = useState(null);
   const [catalogState, setCatalogState] = useState("loading");
   const [catalogAttempt, setCatalogAttempt] = useState(0);
@@ -331,6 +332,7 @@ export default function Step2DeviceInfo({ active, data, onChange, editor, onEdit
   }, [data, expectedHouseCount, onChange]);
 
   function openEditor(index) {
+    setCommunicationHelp(null);
     onEditorChange({
       type: "equipment",
       index,
@@ -428,46 +430,52 @@ export default function Step2DeviceInfo({ active, data, onChange, editor, onEdit
           {t("communication")}
         </p>
         <div className="mt-2.5 flex flex-wrap gap-2">
-          {(() => {
-            const opt = COMMUNICATION_OPTIONS.find((o) => o.key === "tempview");
-            const active = communication[opt.key];
+          {COMMUNICATION_OPTIONS.map((option) => {
+            const active = communication[option.key];
+            const label = option.key === "smartlink" && isOnboard ? `${t(option.labelKey)} onboard` : t(option.labelKey);
+            const helpId = `${section}-${option.key}-help`;
+            const helpOpen = communicationHelp === helpId;
             return (
-              <button
-                type="button"
-                onClick={() => selectDraftCommunication(section, opt.key)}
-                aria-pressed={active}
-                className={`inline-flex items-center gap-1.5 rounded-full border px-4 py-2 text-sm font-medium transition ${active
+              <div
+                key={option.key}
+                className={`inline-flex items-stretch rounded-full border text-sm font-medium transition ${active
                   ? "border-brand bg-brand text-white shadow-sm"
-                  : "border-line-strong bg-white text-ink-soft hover:border-brand hover:bg-brand-tint hover:text-brand-dark"
-                  }`}
+                  : "border-line-strong bg-white text-ink-soft hover:border-brand hover:text-brand-dark"
+                }`}
               >
-                {active && <Icon name="check" style={{ fontSize: 12 }} />}
-                {t(opt.labelKey)}
-              </button>
+                <button
+                  type="button"
+                  onClick={() => selectDraftCommunication(section, option.key)}
+                  aria-pressed={active}
+                  className="inline-flex items-center gap-1.5 rounded-l-full py-2 pl-4 pr-2 transition hover:bg-current/5 focus-visible:outline focus-visible:-outline-offset-2"
+                >
+                  {active && <Icon name="check" style={{ fontSize: 12 }} />}
+                  {label}
+                </button>
+                <button
+                  type="button"
+                  aria-label={t("communicationOptionInfo", { option: label })}
+                  aria-expanded={helpOpen}
+                  aria-controls={helpId}
+                  onClick={() => setCommunicationHelp(helpOpen ? null : helpId)}
+                  className="grid min-w-8 place-items-center rounded-r-full pr-1 transition hover:bg-current/10 focus-visible:outline focus-visible:-outline-offset-2"
+                >
+                  <span aria-hidden="true" className="grid h-4 w-4 place-items-center rounded-full border border-current text-[11px] font-bold leading-none">!</span>
+                </button>
+              </div>
             );
-          })()}
-
-          {(() => {
-            const opt = COMMUNICATION_OPTIONS.find((o) => o.key === "smartlink");
-            const active = communication[opt.key];
-            const label = isOnboard ? `${t("communicationSmartLink")} onboard` : t(opt.labelKey);
-
-            return (
-              <button
-                type="button"
-                onClick={() => selectDraftCommunication(section, opt.key)}
-                aria-pressed={active}
-                className={`inline-flex items-center gap-1.5 rounded-full border px-4 py-2 text-sm font-medium transition ${active
-                  ? "border-brand bg-brand text-white shadow-sm"
-                  : "border-line-strong bg-white text-ink-soft hover:border-brand hover:bg-brand-tint hover:text-brand-dark"
-                  }`}
-              >
-                {active && <Icon name="check" style={{ fontSize: 12 }} />}
-                {label}
-              </button>
-            );
-          })()}
+          })}
         </div>
+        {COMMUNICATION_OPTIONS.map((option) => {
+          const helpId = `${section}-${option.key}-help`;
+          const label = option.key === "smartlink" && isOnboard ? `${t(option.labelKey)} onboard` : t(option.labelKey);
+          return (
+            <div key={helpId} id={helpId} hidden={communicationHelp !== helpId} className="mt-2.5 rounded-xl border border-brand-tint bg-brand-tint/60 px-3 py-2 text-sm leading-5 text-ink-soft">
+              <p className="font-semibold text-ink">{label}</p>
+              <p>{t(option.descKey)}</p>
+            </div>
+          );
+        })}
 
         {showSmartlinkSerial && communication.smartlink && (
           <div className="mt-2.5">
@@ -484,25 +492,6 @@ export default function Step2DeviceInfo({ active, data, onChange, editor, onEdit
           </div>
         )}
 
-        {COMMUNICATION_OPTIONS.filter((opt) => communication[opt.key]).length > 0 && (
-          <div className="mt-2.5 space-y-1.5">
-            {COMMUNICATION_OPTIONS.filter((opt) => communication[opt.key]).map((opt) => {
-              const label = (opt.key === "smartlink" && isOnboard) ? `${t("communicationSmartLink")} onboard` : t(opt.labelKey);
-
-              return (
-                <div
-                  key={opt.key}
-                  className="flex items-start gap-2 rounded-xl border border-brand-tint bg-brand-tint/60 px-3 py-2 text-sm leading-5 text-ink-soft"
-                >
-                  <Icon name="info-circle" style={{ fontSize: 13 }} className="mt-0.5 shrink-0 text-brand" />
-                  <p>
-                    <span className="text-base font-medium text-ink">{label}:</span> {t(opt.descKey)}
-                  </p>
-                </div>
-              );
-            })}
-          </div>
-        )}
       </div>
     );
   }
