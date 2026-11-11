@@ -26,6 +26,7 @@ const FARM_ICON_TEXT_PATTERN = /^[A-Za-z0-9]{1,3}$/;
 const STATUS_TONE = {
   approved: { tint: "#e4f6ee", solid: "#1f8a5c", label: "Approved" },
   pushed: { tint: "#e4f6ee", solid: "#1f8a5c", label: "Approved" },
+  edited: { tint: "#e6f1fb", solid: "#185fa5", label: "Edited" },
   pending: { tint: "#fbf2de", solid: "#b5820a", label: "Pending" },
   rejected: { tint: "#fbeae8", solid: "#b23a2e", label: "Rejected" },
 };
@@ -280,13 +281,6 @@ export default function Home() {
     )));
   }
 
-  // บันทึกการแก้ไขฟาร์ม (mock — เก็บแค่ใน state หน้านี้ ยังไม่ได้บันทึกลง backend จริง)
-  function handleSaveFarmDetail(id, updates) {
-    const today = new Date().toISOString().slice(0, 10);
-    setFarms((prev) => prev.map((f) => (f.id === id ? { ...f, ...updates, updated_at: today } : f)));
-    setDetailFarm((prev) => (prev && prev.id === id ? { ...prev, ...updates, updated_at: today } : prev));
-  }
-
   // สถิติรวมทั้งระบบ — ใช้แสดงในการ์ดสรุปของโหมด Dashboard เท่านั้น
   const totalHouses = farms.reduce((sum, f) => sum + (Number(f.house_count) || 0), 0);
   const totalDevices = farms.reduce(
@@ -302,6 +296,7 @@ export default function Home() {
     { key: "all", label: "All statuses" },
     { key: "approved", label: "Approved" },
     { key: "pending", label: "Pending" },
+    { key: "edited", label: "Edited" },
     { key: "rejected", label: "Rejected" },
   ];
   const currentStatusOption =
@@ -489,9 +484,8 @@ export default function Home() {
         <RegistrationModal
           registration={detailFarm}
           onClose={() => setDetailFarm(null)}
-          onSave={handleSaveFarmDetail}
+          onEdit={(id) => navigate(`/customer/edit/${id}`)}
           canModerate={false}
-          useHouseCountActual={false}
           title={t("farmDetailModalTitle")}
         />
       </div>

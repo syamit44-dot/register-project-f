@@ -1,34 +1,31 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Icon from "../components/Icon";
 import RegistrationModal from "../components/RegistrationModal";
 import { SignOutModal } from "../components/AppShell";
 import { clearAuth } from "../api/auth";
-import { registrationsMockData } from "../data/registrationsMockData";
+import { changeRegistrationStatus, deleteRegistration, listRegistrations } from "../api/client";
 import { useLanguage } from "../i18n.jsx";
 
-// ⚠️ ยังใช้ข้อมูลจำลอง (mock) อยู่ — ยังไม่ได้เชื่อมกับ backend จริง (listRegistrations/getRegistration/
-// pushRegistration/deleteRegistration ใน api/client.js) พอ backend พร้อมค่อยเปลี่ยนมาดึงจาก API แทน
+const PLATFORM_LABEL = { smartlink: "SmartLink", tempview: "TempView / FarmNet" };
 
-const PLATFORM_LABEL = { smartlink: "SmartLink", tempviewFarmnet: "TempView / FarmNet", silonic: "Silonic-Xi" };
-
-// ตัวเลือกใน dropdown filter — ใช้ค่า platform ตามที่มีจริงในข้อมูล (mock data บางแถวเก็บเป็นข้อความเต็ม
-// "Tempview / Farmnet" ไม่ใช่ key แบบ "tempviewFarmnet") จึงอ้างอิงค่าตรงนี้แทนเพื่อให้ filter ตรงกับข้อมูลจริง
 const STATUS_OPTIONS = [
   { key: "pending", labelKey: "statusPending" },
+  { key: "edited", labelKey: "statusEdited" },
   { key: "approved", labelKey: "statusApproved" },
   { key: "rejected", labelKey: "statusRejected" },
 ];
 const PLATFORM_OPTIONS = [
   { key: "smartlink", label: "SmartLink" },
-  { key: "Tempview / Farmnet", label: "Tempview / Farmnet" },
-  { key: "silonic", label: "Silonic-Xi" },
+  { key: "tempview", label: "TempView / FarmNet" },
+  { key: "SmartLink / TempView", label: "SmartLink / TempView" },
 ];
 
 // โทนดำเป็นสีเน้น (header, avatar, ปุ่มที่เลือกอยู่) ส่วนพื้นผิวหลักเป็นสีขาวล้วน
 const STATUS_TONE = {
   approved: { dot: "#1f8a5c", tint: "#e4f6ee", labelKey: "statusApproved" },
   pushed: { dot: "#1f8a5c", tint: "#e4f6ee", labelKey: "statusApproved" },
+  edited: { dot: "#185fa5", tint: "#e6f1fb", labelKey: "statusEdited" },
   pending: { dot: "#b5820a", tint: "#fbf2de", labelKey: "statusPending" },
   rejected: { dot: "#b23a2e", tint: "#fbeae8", labelKey: "statusRejected" },
 };
@@ -144,7 +141,7 @@ function FarmRow({ row, index, t, deleteMode, selected, onToggleSelect, onReview
         {/* ตัวเลขสรุป — Users ขึ้นก่อน ตามด้วย Houses, Devices */}
         <div className="grid shrink-0 grid-cols-3 gap-6 border-slate-100 lg:border-l lg:pl-6 xl:gap-8">
           <RowMetric value={userCount} label="Users" />
-          <RowMetric value={row.house_count_actual} label="Houses" />
+          <RowMetric value={row.house_count} label="Houses" />
           <RowMetric value={deviceCount} label="Devices" />
         </div>
 
@@ -176,7 +173,20 @@ function FarmRow({ row, index, t, deleteMode, selected, onToggleSelect, onReview
 export default function AdminPage() {
   const navigate = useNavigate();
   const { t } = useLanguage();
-  const [rows, setRows] = useState(registrationsMockData);
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [actionError, setActionError] = useState("");
+  const [pendingAction, setPendingAction] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    listRegistrations()
+      .then((data) => { if (active) setRows(data); })
+      .catch(() => { if (active) setLoadError(true); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, []);
   const [search, setSearch] = useState("");
   const [selectedStatuses, setSelectedStatuses] = useState([]);
   const [selectedPlatforms, setSelectedPlatforms] = useState([]);
@@ -189,7 +199,7 @@ export default function AdminPage() {
   const [signOutConfirmOpen, setSignOutConfirmOpen] = useState(false);
 
   const counts = useMemo(() => {
-    const c = { all: rows.length, pending: 0, approved: 0, rejected: 0 };
+    const c = { all: rows.length, pending: 0, edited: 0, approved: 0, rejected: 0 };
     rows.forEach((r) => {
       const s = r.status === "pushed" ? "approved" : r.status;
       if (c[s] !== undefined) c[s] += 1;
@@ -197,18 +207,9 @@ export default function AdminPage() {
     return c;
   }, [rows]);
 
-  // แจ้งเตือน "ลูกค้าแก้ไขข้อมูล" — mock: แถวที่ updated_at ใหม่กว่า created_at
-  // และยังเป็นสถานะ pending (ลูกค้าแก้ไขแล้วแต่แอดมินยังไม่ได้ตรวจ/อนุมัติซ้ำ)
-  // TODO: พอ backend พร้อม ให้เปลี่ยนไปใช้ field จริง เช่น has_pending_changes แทน heuristic นี้
-  const editNotifications = useMemo(() => {
-    return rows
-      .filter((r) => {
-        if (r.status !== "pending") return false;
-        if (!r.updated_at || !r.created_at) return false;
-        return new Date(r.updated_at).getTime() > new Date(r.created_at).getTime();
-      })
-      .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
-  }, [rows]);
+  const editNotifications = useMemo(() => rows
+    .filter((row) => row.status === "edited")
+    .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at)), [rows]);
 
   const filteredRows = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -239,6 +240,7 @@ export default function AdminPage() {
   const detail = rows.find((r) => r.id === detailId) || null;
 
   function openReview(id) {
+    setActionError("");
     setDetailId(id);
     setNotifMenuOpen(false);
   }
@@ -247,18 +249,20 @@ export default function AdminPage() {
     setDetailId(null);
   }
 
-  function updateStatus(id, status) {
-    const today = new Date().toISOString().slice(0, 10);
-    setRows((prev) => prev.map((r) => (r.id === id ? { ...r, status, updated_at: today } : r)));
-    setDetailId(null);
-  }
-
-  function handleApprove(id) {
-    updateStatus(id, "approved");
-  }
-
-  function handleReject(id) {
-    updateStatus(id, "rejected");
+  async function updateStatus(id, action) {
+    setPendingAction(true);
+    setActionError("");
+    try {
+      await changeRegistrationStatus(id, action);
+      setRows((prev) => prev.map((row) => row.id === id ? {
+        ...row, status: action === "approve" ? "approved" : "rejected",
+      } : row));
+      setDetailId(null);
+    } catch {
+      setActionError(t("farmAdminActionError"));
+    } finally {
+      setPendingAction(false);
+    }
   }
 
   function toggleDeleteSelection(id) {
@@ -269,25 +273,29 @@ export default function AdminPage() {
 
   function handleDeleteSelected() {
     if (selectedDeleteIds.length === 0) return;
+    setActionError("");
     setConfirmDeleteOpen(true);
   }
 
-  function confirmDeleteSelected() {
-    setRows((prev) => prev.filter((r) => !selectedDeleteIds.includes(r.id)));
-    setSelectedDeleteIds([]);
-    setDeleteMode(false);
-    setConfirmDeleteOpen(false);
+  async function confirmDeleteSelected() {
+    setPendingAction(true);
+    setActionError("");
+    const results = await Promise.allSettled(selectedDeleteIds.map((id) => deleteRegistration(id)));
+    const deleted = new Set(selectedDeleteIds.filter((_, index) => results[index].status === "fulfilled"));
+    setRows((prev) => prev.filter((row) => !deleted.has(row.id)));
+    setSelectedDeleteIds((prev) => prev.filter((id) => !deleted.has(id)));
+    if (deleted.size === selectedDeleteIds.length) {
+      setDeleteMode(false);
+      setConfirmDeleteOpen(false);
+    } else {
+      setActionError(t("farmAdminActionError"));
+    }
+    setPendingAction(false);
   }
 
   function handleSignOut() {
     clearAuth();
     navigate("/");
-  }
-
-  // บันทึกการแก้ไขข้อมูล (ชั่วคราว) จาก modal — เก็บแค่ใน state ของหน้านี้ ยังไม่ได้เชื่อมกับ backend จริง
-  function handleSaveEdit(id, updates) {
-    const today = new Date().toISOString().slice(0, 10);
-    setRows((prev) => prev.map((r) => (r.id === id ? { ...r, ...updates, updated_at: today } : r)));
   }
 
   return (
@@ -547,7 +555,11 @@ export default function AdminPage() {
           {/* รายการฟาร์ม — เฉพาะส่วนนี้เท่านั้นที่เลื่อนได้ */}
           <div className="admin-scroll min-h-0 flex-1 overflow-y-auto">
             <div className="mx-auto w-full max-w-[1500px] px-5 pb-6 sm:px-8">
-              {filteredRows.length === 0 ? (
+              {loading ? (
+                <p role="status" className="p-6 text-sm text-ink-soft">{t("loading")}</p>
+              ) : loadError ? (
+                <p role="alert" className="p-6 text-sm text-alert">{t("farmListLoadError")}</p>
+              ) : filteredRows.length === 0 ? (
                 <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-16 text-center">
                   <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
                     <Icon name="search" style={{ fontSize: 19 }} />
@@ -585,10 +597,12 @@ export default function AdminPage() {
             <p className="mt-1.5 text-center text-[13.5px] text-slate-500">
               {t("confirmDeleteHint", { count: selectedDeleteIds.length })}
             </p>
+            {actionError && <p role="alert" className="mt-3 text-sm text-alert">{actionError}</p>}
             <div className="mt-6 flex gap-3">
               <button
                 type="button"
                 className="flex-1 rounded-xl border border-slate-200 py-2.5 text-[13.5px] font-semibold text-slate-700 transition hover:bg-slate-50"
+                disabled={pendingAction}
                 onClick={() => setConfirmDeleteOpen(false)}
               >
                 {t("cancel")}
@@ -596,6 +610,7 @@ export default function AdminPage() {
               <button
                 type="button"
                 className="flex-1 rounded-xl bg-[#b23a2e] py-2.5 text-[13.5px] font-semibold text-white transition hover:bg-[#98301f]"
+                disabled={pendingAction}
                 onClick={confirmDeleteSelected}
               >
                 {t("deleteNow")}
@@ -614,9 +629,11 @@ export default function AdminPage() {
       <RegistrationModal
         registration={detail}
         onClose={closeReview}
-        onApprove={handleApprove}
-        onReject={handleReject}
-        onSave={handleSaveEdit}
+        onApprove={(id) => updateStatus(id, "approve")}
+        onReject={(id) => updateStatus(id, "reject")}
+        onEdit={(id) => navigate(`/admin/farms/${id}/edit`)}
+        pending={pendingAction}
+        error={actionError}
       />
     </>
   );

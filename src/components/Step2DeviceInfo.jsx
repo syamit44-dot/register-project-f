@@ -58,6 +58,7 @@ function emptyHouseDetail() {
     alarm_communication: emptyCommunication(),
     silonic_enabled: false,
     silonic_communication: emptyCommunication(),
+    silonic_use_app: false,
     silonic_models: [],
     silonic_serial_number: "",
   };
@@ -119,6 +120,7 @@ function normalizeHouse(h) {
     base.alarm_communication = emptyCommunication();
     base.egg_communication = emptyCommunication();
     base.silonic_communication = emptyCommunication();
+    base.silonic_use_app = false;
     base.smartlink_serial_number = "";
     base.silonic_enabled = false;
     base.silonic_serial_number = "";
@@ -130,6 +132,7 @@ function normalizeHouse(h) {
 
 function copyEquipmentModels(source, target, modelKey) {
   return source.map((item, index) => ({
+    id: target[index]?.id,
     [modelKey]: item[modelKey],
     model_id: item.model_id,
     model_name: item.model_name,
@@ -160,6 +163,7 @@ function copyHouseSettings(source, target) {
     silonic_enabled: source.silonic_enabled,
     silonic_models: silonicModels,
     silonic_communication: { ...source.silonic_communication },
+    silonic_use_app: source.silonic_enabled && source.silonic_communication.smartlink && source.silonic_use_app,
     silonic_serial_number: silonicModels[0]?.serial_number ?? "",
   };
   // Legacy fields must not repopulate equipment that the copied settings removed.
@@ -362,7 +366,11 @@ export default function Step2DeviceInfo({ active, data, onChange, editor, onEdit
       const isActive = prev[section][key];
       const next = emptyCommunication();
       if (!isActive) next[key] = true;
-      return { ...prev, [section]: next };
+      return {
+        ...prev,
+        [section]: next,
+        ...(section === "silonic_communication" && !next.smartlink ? { silonic_use_app: false } : {}),
+      };
     });
   }
 
@@ -370,6 +378,7 @@ export default function Step2DeviceInfo({ active, data, onChange, editor, onEdit
     setDraft((prev) => ({
       ...prev,
       [field]: option.value ? [{
+        id: prev[field][0]?.id ?? houses[editingIndex]?.[field]?.[0]?.id,
         [key]: option.value,
         model_id: option.id,
         model_name: option.label,
@@ -769,6 +778,12 @@ export default function Step2DeviceInfo({ active, data, onChange, editor, onEdit
                           )}
                         </div>
                         {renderCommunicationPicker("silonic_communication")}
+                        {draft.silonic_communication.smartlink && (
+                          <label className="mt-3 flex items-center gap-2 text-sm font-medium text-ink">
+                            <input type="checkbox" className="h-4 w-4 accent-brand" checked={draft.silonic_use_app} onChange={(event) => updateDraft({ silonic_use_app: event.target.checked })} />
+                            {t("weightScaleUseApp")}
+                          </label>
+                        )}
                       </div>
                       <ModelImagePreview
                         image={findArtwork(modelWeightScaleData, selectedSilonic[0])?.image}

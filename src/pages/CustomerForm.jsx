@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, useBlocker, useNavigate } from "react-router-dom";
+import { Link, useBlocker, useNavigate, useParams } from "react-router-dom";
 import { AppShellStyles, SidebarNav, SignOutModal } from "../components/AppShell";
 import { clearAuth, getAuth } from "../api/auth";
 import StepRail from "../components/StepRail";
@@ -8,9 +8,10 @@ import Step2DeviceInfo from "../components/Step2DeviceInfo";
 import Step3Users from "../components/Step3Users";
 import Step4Confirm from "../components/Step4Confirm";
 import Icon from "../components/Icon";
-import { createRegistration } from "../api/client";
+import { createRegistration, fetchEquipmentModels, getRegistration, updateRegistration } from "../api/client";
 import { useLanguage } from "../i18n.jsx";
 import { registrationErrorMessage, registrationPayload } from "../utils/registrationPayload";
+import { registrationFormData } from "../utils/registrationModels";
 
 const initialData = {
   farm_name: "",
@@ -40,7 +41,6 @@ const initialData = {
   note: "",
   pdpa_consent: false,
 };
-const emptyDraftData = JSON.stringify(initialData);
 const RETURN_HOME_SECONDS = 30;
 
 function removeLegacyDraft() {
@@ -132,11 +132,51 @@ function StepFooter({ onBack, onNext, nextLabel, nextIcon = "arrow-right", nextD
   );
 }
 
-export default function CustomerForm() {
+export function FarmEditPage({ isAdmin = false }) {
+  const { farmId } = useParams();
+  return <FarmEditLoader key={farmId} farmId={farmId} isAdmin={isAdmin} />;
+}
+
+function FarmEditLoader({ farmId, isAdmin }) {
+  const { t } = useLanguage();
+  const [registration, setRegistration] = useState(null);
+  const [error, setError] = useState("");
+  const returnTo = isAdmin ? "/admin" : "/home";
+
+  useEffect(() => {
+    const controller = new AbortController();
+    async function load() {
+      try {
+        const record = await getRegistration(farmId, isAdmin, controller.signal);
+        if (record.farm.status === "APPROVE") {
+          if (!controller.signal.aborted) setError("farmEditApproved");
+          return;
+        }
+        const catalog = await fetchEquipmentModels(controller.signal);
+        if (!controller.signal.aborted) {
+          setRegistration({ data: registrationFormData(record, catalog), isDealer: record.farm.user?.account_type === "dealer" });
+        }
+      } catch {
+        if (!controller.signal.aborted) setError("farmEditLoadError");
+      }
+    }
+    load();
+    return () => controller.abort();
+  }, [farmId, isAdmin]);
+
+  if (!registration) {
+    return <div className="mx-auto max-w-xl space-y-4 p-8"><p role="status">{t(error || "loading")}</p><Link className="text-brand underline" to={returnTo}>{t("back")}</Link></div>;
+  }
+  return <CustomerForm initialValues={registration.data} isDealer={registration.isDealer} isAdmin={isAdmin} />;
+}
+
+export default function CustomerForm({ initialValues = initialData, isDealer = getAuth()?.account_type === "dealer", isAdmin = false }) {
   const navigate = useNavigate();
   const { t } = useLanguage();
+  const editing = Boolean(initialValues.id);
+  const returnTo = isAdmin ? "/admin" : "/home";
   const [current, setCurrent] = useState(0);
-  const [data, setData] = useState(initialData);
+  const [data, setData] = useState(initialValues);
   const [editor, setEditor] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -144,10 +184,10 @@ export default function CustomerForm() {
   const [secondsRemaining, setSecondsRemaining] = useState(RETURN_HOME_SECONDS);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [signOutConfirmOpen, setSignOutConfirmOpen] = useState(false);
-  const leavingViaSignOut = useRef(false);
-  const hasDraft = !done && (editor?.dirty || JSON.stringify(data) !== emptyDraftData);
+  const allowLeave = useRef(false);
+  const hasDraft = !done && (editor?.dirty || JSON.stringify(data) !== JSON.stringify(initialValues));
   const blocker = useBlocker(({ currentLocation, nextLocation }) => (
-    Boolean(hasDraft) && !leavingViaSignOut.current
+    Boolean(hasDraft) && !allowLeave.current
     && currentLocation.pathname !== nextLocation.pathname
   ));
 
@@ -186,22 +226,29 @@ export default function CustomerForm() {
   }
 
   function handleSignOut() {
-    leavingViaSignOut.current = true;
+    allowLeave.current = true;
     clearAuth();
     navigate("/");
   }
 
   async function handleSubmit() {
     setError("");
-    if (!data.pdpa_consent) {
+    if (!editing && !data.pdpa_consent) {
       setError(t("pdpaConsentRequired"));
       return;
     }
 
     setSubmitting(true);
     try {
-      await createRegistration(registrationPayload(data, t, getAuth()?.account_type === "dealer"));
-      setDone(true);
+      const payload = registrationPayload(data, t, isDealer, editing ? initialValues : null);
+      if (editing) {
+        await updateRegistration(payload, isAdmin);
+        allowLeave.current = true;
+        navigate(returnTo, { replace: true });
+      } else {
+        await createRegistration(payload);
+        setDone(true);
+      }
     } catch (err) {
       setError(registrationErrorMessage(err, t));
     } finally {
@@ -268,8 +315,9 @@ export default function CustomerForm() {
                 <div className="editorial-form min-w-0">
                   <div className="editorial-header px-5 py-6 sm:px-8 sm:py-7">
                     <h1 className="mb-6 text-[30px] font-bold tracking-[-0.03em] text-white sm:text-[40px]">
-                      {t("newRegistrationTitle")}
+                      {t(editing ? "farmEditTitle" : "newRegistrationTitle")}
                     </h1>
+                    {editing && <Link className="mb-4 inline-block text-sm font-semibold text-white underline" to={returnTo}>{t("cancel")}</Link>}
                     <div className="editorial-step-nav">
                       <StepRail current={current} onGoTo={setCurrent} />
                     </div>
@@ -286,7 +334,7 @@ export default function CustomerForm() {
                   </div>
 
                   <div className={`${current === 2 ? "block" : "hidden"}`}>
-                    <Step3Users data={data} onChange={setData} isDealer={getAuth()?.account_type === "dealer"} />
+                    <Step3Users data={data} onChange={setData} isDealer={isDealer} allowModelChange={editing} />
                     <StepFooter onBack={back} onNext={next} nextLabel={t("next")} />
                   </div>
 
@@ -295,9 +343,9 @@ export default function CustomerForm() {
                     <StepFooter
                       onBack={back}
                       onNext={handleSubmit}
-                      nextLabel={submitting ? t("submitting") : t("submit")}
+                      nextLabel={submitting ? t("submitting") : t(editing ? "save" : "submit")}
                       nextIcon="check"
-                      nextDisabled={submitting}
+                      nextDisabled={submitting || (editing && !hasDraft)}
                       error={error}
                     />
                   </div>

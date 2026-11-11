@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Icon from "./Icon";
 import modelData from "../data/modelData";
-import { getSelectedControllerModels } from "../utils/registrationModels";
+import { getSelectedAppModels } from "../utils/registrationModels";
 import { useLanguage } from "../i18n.jsx";
 
 const USER_TYPE_KEYS = { normal: "userTypeNormal", super: "userTypeSuper" };
@@ -186,7 +186,7 @@ export default function Step4Confirm({ data, onChange, onGoTo }) {
   const dealerContactParts = summarizeDealerContact(data, t);
   const houses = data.houses ?? [];
   const appUsers = data.app_users ?? [];
-  const selectedModels = useMemo(() => getSelectedControllerModels(houses), [houses]);
+  const selectedModels = useMemo(() => getSelectedAppModels(houses), [houses]);
   const userGroups = useMemo(
     () => groupUsersByModel(appUsers, selectedModels),
     [appUsers, selectedModels]
@@ -278,6 +278,9 @@ export default function Step4Confirm({ data, onChange, onGoTo }) {
                                     </span>
                                   )}
                                 </InfoRow>
+                                {group.models === "silonic_models" && communication?.smartlink && (
+                                  <InfoRow label={t("weightScaleUseApp")} value={t(house.silonic_use_app ? "yes" : "no")} />
+                                )}
                               </dl>
                             </li>
                           );

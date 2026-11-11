@@ -104,26 +104,28 @@ export function createRegistration(payload) {
 
 /* ---------- หน้า Admin ---------- */
 
-// ดึงรายการลงทะเบียนทั้งหมด (รองรับ query ค้นหา ?search=)
-export function listRegistrations(search = "") {
-  return api
-    .get("/registrations/", { params: search ? { search } : {} })
-    .then((res) => res.data.results ?? res.data);
+// ดึงรายการลงทะเบียนทั้งหมดสำหรับ Admin
+export function listRegistrations() {
+  return fetchFarms("admin");
 }
 
-// ดึงข้อมูลภายในของรายการเดียว (ใช้เปิด modal)
-export function getRegistration(id) {
-  return api.get(`/registrations/${id}/`).then((res) => res.data);
+// ดึงข้อมูลฟาร์มสำหรับฟอร์มแก้ไข
+export function getRegistration(id, isAdmin, signal) {
+  return api.get(`/get-farm/${isAdmin ? "admin" : "user"}/${id}`, { signal }).then((res) => res.data);
 }
 
-// เปลี่ยนสถานะเป็น pushed
-export function pushRegistration(id) {
-  return api.post(`/registrations/${id}/push/`).then((res) => res.data);
+// อนุมัติหรือปฏิเสธรายการ
+export function changeRegistrationStatus(id, action) {
+  return api.post(`/admin/farm/${id}/${action}`).then((res) => res.data);
 }
 
 // ลบรายการ
 export function deleteRegistration(id) {
-  return api.delete(`/registrations/${id}/`).then((res) => res.data);
+  return api.delete(`/admin/farm/${id}`).then((res) => res.data);
+}
+
+export function updateRegistration(payload, isAdmin) {
+  return api.post(isAdmin ? "/admin/request/update" : "/request/update", payload).then((res) => res.data);
 }
 
 /* ---------- Check access key (ก่อนเริ่ม sign up) ---------- */
@@ -156,7 +158,7 @@ export function signUp({ username, account_type, email, password, first_name, la
 
 /* ---------- หน้า Home: ฟาร์มของบัญชีที่เข้าสู่ระบบ ---------- */
 
-const FARM_STATUSES = { PENDING: "pending", EDIT: "pending", APPROVE: "approved", REJECT: "rejected" };
+const FARM_STATUSES = { PENDING: "pending", EDIT: "edited", APPROVE: "approved", REJECT: "rejected" };
 
 function toFarmSummary({ farm, device, alarm, egg, silonic, userapp }, modelNames) {
   const equipment = [
@@ -202,9 +204,10 @@ function toFarmSummary({ farm, device, alarm, egg, silonic, userapp }, modelName
     created_at: farm.date_created,
     updated_at: farm.date_edit,
     houses: [...houses.values()].sort((a, b) => Number(a.id) - Number(b.id)),
-    app_users: userapp.map(({ id, username, userType, isDealer }) => ({
+    app_users: userapp.map(({ id, username, userType, isDealer, userEmail }) => ({
       id,
       username,
+      email: userEmail,
       is_dealer: Boolean(isDealer),
       user_type: userType === "Superuser" ? "super" : "normal",
     })),
@@ -228,12 +231,16 @@ export async function fetchEquipmentModels(signal) {
   return data;
 }
 
-export async function fetchUserFarms() {
-  const { data: farms } = await api.get("/get-farm/user");
+async function fetchFarms(scope) {
+  const { data: farms } = await api.get(`/get-farm/${scope}`);
   if (farms.length === 0) return [];
   const models = await fetchEquipmentModels();
   const modelNames = new Map(models.map(({ id, name }) => [id, name]));
   return farms.map((farm) => toFarmSummary(farm, modelNames));
+}
+
+export function fetchUserFarms() {
+  return fetchFarms("user");
 }
 
 export function updateFarmIcon(farmId, iconId, iconText = "") {

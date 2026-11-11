@@ -12,6 +12,7 @@ const STATUS_CONFIG = {
     icon: "clock",
     className: "bg-amber-tint text-amber",
   },
+  edited: { labelKey: "statusEdited", icon: "edit", className: "bg-brand-tint text-brand-dark" },
   rejected: {
     labelKey: "statusRejected",
     icon: "x",

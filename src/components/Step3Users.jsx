@@ -1,20 +1,20 @@
 import { useMemo, useState } from "react";
 import Icon from "./Icon";
 import SearchableSelect from "./SearchableSelect";
-import { getSelectedControllerModels } from "../utils/registrationModels";
+import { getSelectedAppModels } from "../utils/registrationModels";
 import { APP_USERNAME_MAX_LENGTH, FARM_APP_USER_LIMIT, isValidAppUsername, sanitizeAppUsername } from "../utils/registrationPayload";
 import { useLanguage } from "../i18n.jsx";
 
 const DEALER_GROUP = "__dealer__";
 
-export default function Step3Users({ data, onChange, isDealer }) {
+export default function Step3Users({ data, onChange, isDealer, allowModelChange = false }) {
   const { t } = useLanguage();
   const [showUserInfo, setShowUserInfo] = useState(false);
   // เก็บสถานะ ย่อ/ขยาย ของแต่ละกลุ่มด้วย key ของกลุ่ม — ค่าเริ่มต้นคือ "ขยาย" ทุกกลุ่ม
   // (ไม่ต้องระบุใน state ก็ถือว่าขยายอยู่ ยกเว้นจะถูกเพิ่มลง collapsedGroups)
   const [collapsedGroups, setCollapsedGroups] = useState(() => new Set());
 
-  const selectedModels = useMemo(() => getSelectedControllerModels(data.houses), [data.houses]);
+  const selectedModels = useMemo(() => getSelectedAppModels(data.houses), [data.houses]);
 
   const mainUsers = data.app_users.filter((user) => !user.is_dealer);
   const mainLimitReached = mainUsers.length >= FARM_APP_USER_LIMIT;
@@ -211,7 +211,7 @@ export default function Step3Users({ data, onChange, isDealer }) {
                     <div className="border-t border-line p-4 pt-4 sm:px-5">
                       <div className="space-y-2">
                         {group.users.map((u) => {
-                          const invalidUsername = Boolean(u.username) && !isValidAppUsername(u.username);
+                          const invalidUsername = Boolean(u.username) && u.username !== u.original_username && !isValidAppUsername(u.username);
                           const canSelectSuper = dealerGroup || u.user_type === "super" || mainSuperusers === 0;
                           const usernameErrorId = `app-username-error-${u.index}`;
                           return (
@@ -219,7 +219,7 @@ export default function Step3Users({ data, onChange, isDealer }) {
                               className="grid gap-3 rounded-xl border border-line bg-mist/50 p-3.5 md:grid-cols-[1fr_1fr_1fr_auto]"
                               key={u.index}
                             >
-                              {dealerGroup && (
+                              {(allowModelChange || dealerGroup || group.key === "__unassigned__") && (
                                 <div className="md:col-span-full">
                                   <SearchableSelect
                                     label={t("deviceModel")}

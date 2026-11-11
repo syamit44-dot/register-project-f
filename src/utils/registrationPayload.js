@@ -21,9 +21,9 @@ export function sanitizeAppUsername(value) {
 
 export const FARM_APP_USER_LIMIT = 5;
 
-export function registrationPayload(data, t, isDealer = false) {
+export function registrationPayload(data, t, isDealer = false, original = null) {
   const equipment = { device: [], alarm: [], silonic: [], egg: [] };
-  const controllerIds = new Map();
+  const appModelIds = new Set();
 
   data.houses.forEach((house, index) => {
     const enabled = equipmentFields.filter((field) => house[field.enabled]);
@@ -46,9 +46,15 @@ export function registrationPayload(data, t, isDealer = false) {
         [field.modelField]: item.model_id,
         [field.serialField]: item.serial_number.trim(),
       };
+      const id = item.id ?? original?.houses[index]?.[field.models]?.[0]?.id;
+      if (id) row.id = id;
       if (field.output === "device") {
-        controllerIds.set(item.model, item.model_id);
+        appModelIds.add(String(item.model_id));
         if (needsSmartlinkSerial) row.smartlinkSN = house.smartlink_serial_number.trim();
+      }
+      if (field.output === "silonic") {
+        row.useApp = type === "SMARTLINK" && Boolean(house.silonic_use_app);
+        if (row.useApp) appModelIds.add(String(item.model_id));
       }
       equipment[field.output].push(row);
     }
@@ -58,21 +64,25 @@ export function registrationPayload(data, t, isDealer = false) {
   const appUsers = data.app_users.filter((user) => user.device_model || user.email || user.username !== "default1234");
   const mainUsers = appUsers.filter((user) => !user.is_dealer);
   const dealerCount = appUsers.length - mainUsers.length;
-  if (mainUsers.length > FARM_APP_USER_LIMIT) throw new RegistrationInputError(t("userLimitWarning"));
-  if (mainUsers.filter((user) => user.user_type === "super").length > 1) {
+  const originalMain = original?.app_users.filter((user) => !user.is_dealer) ?? [];
+  if (mainUsers.length > Math.max(FARM_APP_USER_LIMIT, originalMain.length)) throw new RegistrationInputError(t("userLimitWarning"));
+  const originalSuperusers = originalMain.filter((user) => user.user_type === "super").length;
+  if (mainUsers.filter((user) => user.user_type === "super").length > Math.max(1, originalSuperusers)) {
     throw new RegistrationInputError(t("appSuperuserLimit"));
   }
   if (dealerCount > Number(isDealer)) throw new RegistrationInputError(t("dealerAppUserLimit"));
 
   const userapp = appUsers.map((user) => {
-    const model = controllerIds.get(user.device_model);
-    if (!model) throw new RegistrationInputError(t("registrationUserNeedsController"));
-    if (!isValidAppUsername(user.username)) {
+    const model = String(user.device_model ?? "");
+    if (!appModelIds.has(model)) throw new RegistrationInputError(t("registrationUserNeedsController"));
+    const previous = original?.app_users.find((item) => item.id === user.id || (!user.id && item.username === user.username));
+    if (previous?.username !== user.username && !isValidAppUsername(user.username)) {
       throw new RegistrationInputError(t("registrationAppUsernameInvalid"));
     }
     return {
       username: user.username,
-      deviceModel: model,
+      ...(previous ? { id: previous.id } : {}),
+      deviceModel: Number(model),
       userType: user.user_type === "super" ? "Superuser" : "Normaluser",
       isDealer: Boolean(user.is_dealer),
       userEmail: user.email?.trim() || null,
@@ -81,6 +91,7 @@ export function registrationPayload(data, t, isDealer = false) {
 
   return {
     farm: {
+      ...(original ? { id: original.id } : {}),
       nameFarm: farmName,
       companyName: data.farm_short.trim(),
       numbOfHouse: String(data.house_count),
