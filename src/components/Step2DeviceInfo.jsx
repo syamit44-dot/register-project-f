@@ -232,25 +232,33 @@ function ModelImagePreview({ image, svgHtml, name }) {
   );
 }
 
-function EquipmentSerialField({ disabled, value, onChange }) {
+function EquipmentSerialField({ disabled, value, onChange, showError, smartlink = false }) {
   const { t } = useLanguage();
+  const placeholder = t(smartlink ? "smartlinkSnPlaceholder" : "enterSerialNumber");
+  const missing = !value.trim();
+  const invalid = showError && missing;
 
   return (
     <label className="block min-w-0 flex-1">
       <span className="mb-1.5 block">
         <span className="text-[13px] font-semibold text-ink">
-          S / N<span className="ml-0.5 text-alert">*</span>
+          {smartlink ? t("smartlinkSnLabel") : "S / N"}<span className="ml-0.5 text-alert">*</span>
         </span>
       </span>
       <input
         type="text"
         aria-required="true"
-        className="block h-11 w-full rounded-xl border border-line-strong bg-white px-3.5 text-[13.5px] text-ink shadow-sm outline-none transition hover:border-brand/50 focus:border-brand focus:ring-4 focus:ring-brand-tint disabled:bg-mist disabled:text-ink-soft disabled:shadow-none"
-        placeholder={t("enterSerialNumber")}
+        aria-invalid={invalid}
+        data-missing-serial={missing ? "" : undefined}
+        className={`block h-11 w-full rounded-xl border bg-white px-3.5 text-[13.5px] text-ink shadow-sm outline-none transition focus:ring-4 disabled:bg-mist disabled:text-ink-soft disabled:shadow-none ${invalid
+          ? "border-alert focus:ring-alert-tint"
+          : "border-line-strong hover:border-brand/50 focus:border-brand focus:ring-brand-tint"}`}
+        placeholder={placeholder}
         disabled={disabled}
         value={value}
         onChange={(e) => onChange(e.target.value)}
       />
+      {invalid && <span role="alert" className="mt-1 block text-xs text-alert">{placeholder}</span>}
     </label>
   );
 }
@@ -266,6 +274,7 @@ export default function Step2DeviceInfo({ active, data, onChange, editor, onEdit
   const copyTargets = editor?.targets ?? [];
   const [showHouseListInfo, setShowHouseListInfo] = useState(false);
   const [communicationHelp, setCommunicationHelp] = useState(null);
+  const [showSerialErrors, setShowSerialErrors] = useState(false);
   const [equipmentModels, setEquipmentModels] = useState(null);
   const [catalogState, setCatalogState] = useState("loading");
   const [catalogAttempt, setCatalogAttempt] = useState(0);
@@ -333,6 +342,7 @@ export default function Step2DeviceInfo({ active, data, onChange, editor, onEdit
 
   function openEditor(index) {
     setCommunicationHelp(null);
+    setShowSerialErrors(false);
     onEditorChange({
       type: "equipment",
       index,
@@ -341,18 +351,29 @@ export default function Step2DeviceInfo({ active, data, onChange, editor, onEdit
     });
   }
 
-  function closeEditor() {
-    onEditorChange(null);
+  function validateSerials(event) {
+    // The bulk editor copies settings; each house collects its own serial numbers.
+    if (isBulkEditing) return true;
+    const firstMissing = event.currentTarget.closest('[role="dialog"]').querySelector("[data-missing-serial]");
+    if (!firstMissing) return true;
+    setShowSerialErrors(true);
+    firstMissing.scrollIntoView({ block: "nearest" });
+    firstMissing.focus({ preventScroll: true });
+    return false;
   }
 
-  function saveEditor() {
-    if (!draft || (isBulkEditing && !canCopy)) return;
+  function closeEditor(event) {
+    if (validateSerials(event)) onEditorChange(null);
+  }
+
+  function saveEditor(event) {
+    if (!draft || (isBulkEditing && !canCopy) || !validateSerials(event)) return;
     const nextHouses = data.houses.map((house, index) => {
       if (isBulkEditing && copyTargets.includes(index)) return copyHouseSettings(draft, houses[index]);
       return index === editingIndex ? { ...draft, configured: true } : house;
     });
     onChange({ ...data, houses: nextHouses });
-    closeEditor();
+    onEditorChange(null);
   }
 
   function updateDraft(patch) {
@@ -479,16 +500,12 @@ export default function Step2DeviceInfo({ active, data, onChange, editor, onEdit
 
         {showSmartlinkSerial && communication.smartlink && (
           <div className="mt-2.5">
-            <label className="block text-[13px] font-semibold text-ink">
-              {t("smartlinkSnLabel")}<span className="ml-0.5 text-alert">*</span>
-              <input
-                type="text"
-                className="mt-1.5 h-11 w-full rounded-xl border border-line-strong bg-white px-3.5 text-[13.5px] text-ink shadow-sm outline-none transition hover:border-brand/50 focus:border-brand focus:ring-4 focus:ring-brand-tint"
-                placeholder={t("smartlinkSnPlaceholder")}
-                value={draft.smartlink_serial_number ?? ""}
-                onChange={(e) => updateDraft({ smartlink_serial_number: e.target.value })}
-              />
-            </label>
+            <EquipmentSerialField
+              smartlink
+              showError={showSerialErrors}
+              value={draft.smartlink_serial_number ?? ""}
+              onChange={(value) => updateDraft({ smartlink_serial_number: value })}
+            />
           </div>
         )}
 
@@ -688,6 +705,7 @@ export default function Step2DeviceInfo({ active, data, onChange, editor, onEdit
                           </div>
                           {!isBulkEditing && (
                             <EquipmentSerialField
+                              showError={showSerialErrors}
                               disabled={!selectedModel}
                               value={draft.device_models?.[0]?.serial_number ?? ""}
                               onChange={(value) => changeEquipmentSerial("device_models", value)}
@@ -724,6 +742,7 @@ export default function Step2DeviceInfo({ active, data, onChange, editor, onEdit
                           </div>
                           {!isBulkEditing && (
                             <EquipmentSerialField
+                              showError={showSerialErrors}
                               disabled={!selectedAlarms[0]?.key}
                               value={draft.alarms?.[0]?.serial_number ?? ""}
                               onChange={(value) => changeEquipmentSerial("alarms", value)}
@@ -760,6 +779,7 @@ export default function Step2DeviceInfo({ active, data, onChange, editor, onEdit
                           </div>
                           {!isBulkEditing && (
                             <EquipmentSerialField
+                              showError={showSerialErrors}
                               disabled={!selectedSilonic[0]?.model}
                               value={draft.silonic_models?.[0]?.serial_number ?? ""}
                               onChange={(value) => changeEquipmentSerial("silonic_models", value)}
@@ -802,6 +822,7 @@ export default function Step2DeviceInfo({ active, data, onChange, editor, onEdit
                           </div>
                           {!isBulkEditing && (
                             <EquipmentSerialField
+                              showError={showSerialErrors}
                               disabled={!selectedEggModels[0]?.model}
                               value={draft.egg_models?.[0]?.serial_number ?? ""}
                               onChange={(value) => changeEquipmentSerial("egg_models", value)}
