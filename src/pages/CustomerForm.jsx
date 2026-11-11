@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useBlocker, useNavigate } from "react-router-dom";
+import { Link, useBlocker, useNavigate } from "react-router-dom";
 import { AppShellStyles, SidebarNav, SignOutModal } from "../components/AppShell";
 import { clearAuth, getAuth } from "../api/auth";
 import StepRail from "../components/StepRail";
@@ -41,6 +41,7 @@ const initialData = {
   pdpa_consent: false,
 };
 const emptyDraftData = JSON.stringify(initialData);
+const RETURN_HOME_SECONDS = 30;
 
 function removeLegacyDraft() {
   const auth = getAuth();
@@ -140,6 +141,7 @@ export default function CustomerForm() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [done, setDone] = useState(false);
+  const [secondsRemaining, setSecondsRemaining] = useState(RETURN_HOME_SECONDS);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [signOutConfirmOpen, setSignOutConfirmOpen] = useState(false);
   const leavingViaSignOut = useRef(false);
@@ -150,6 +152,21 @@ export default function CustomerForm() {
   ));
 
   useEffect(removeLegacyDraft, []);
+
+  useEffect(() => {
+    if (!done) return;
+    const deadline = Date.now() + RETURN_HOME_SECONDS * 1000;
+    const countdown = window.setInterval(() => {
+      const remaining = Math.ceil((deadline - Date.now()) / 1000);
+      if (remaining <= 0) {
+        window.clearInterval(countdown);
+        navigate("/home", { replace: true });
+        return;
+      }
+      setSecondsRemaining(remaining);
+    }, 1000);
+    return () => window.clearInterval(countdown);
+  }, [done, navigate]);
 
   useEffect(() => {
     if (!hasDraft) return;
@@ -235,6 +252,13 @@ export default function CustomerForm() {
                     </p>
                     <p className="mt-2 text-[13.5px] leading-6 text-ink-soft">
                       {t("submissionSuccessTimeframe")}
+                    </p>
+                    <Link to="/home" replace className="mt-6 inline-flex items-center gap-2 rounded-lg bg-brand px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark">
+                      <Icon name="home" style={{ fontSize: 15 }} />
+                      {t("registrationBackToHome")}
+                    </Link>
+                    <p className="mt-3 text-[13px] text-ink-soft tabular-nums">
+                      {t("registrationHomeCountdown", { seconds: secondsRemaining })}
                     </p>
                   </div>
                 </div>

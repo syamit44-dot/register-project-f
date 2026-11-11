@@ -292,6 +292,8 @@ const messages = {
     smartlinkSnPlaceholder: "กรอกหมายเลข S/N ของ SmartLink",
     submissionSuccessMessage: "ทีมงานจะตรวจสอบข้อมูลของฟาร์ม \"{farm}\" และดำเนินการต่อไป",
     submissionSuccessTimeframe: "ระบบจะใช้เวลาตรวจสอบและยืนยันข้อมูลภายใน 24 ชั่วโมง",
+    registrationBackToHome: "กลับหน้าหลัก",
+    registrationHomeCountdown: "จะกลับหน้าหลักอัตโนมัติใน {seconds} วินาที",
   },
   en: {
     appTitle: "Register",
@@ -582,6 +584,8 @@ const messages = {
     smartlinkSnPlaceholder: "Enter the SmartLink S/N",
     submissionSuccessMessage: "Our team will review the information for farm \"{farm}\" and proceed accordingly",
     submissionSuccessTimeframe: "The review and confirmation process will take up to 24 hours",
+    registrationBackToHome: "Back to Home",
+    registrationHomeCountdown: "Returning to Home in {seconds} s",
   },
 zh: {
     appTitle: "注册",
@@ -872,6 +876,8 @@ zh: {
     smartlinkSnPlaceholder: "请输入 SmartLink 的序列号",
     submissionSuccessMessage: "我们的团队将审核农场 \"{farm}\" 的信息并继续后续处理",
     submissionSuccessTimeframe: "系统将在 24 小时内完成审核与确认",
+    registrationBackToHome: "返回主页",
+    registrationHomeCountdown: "将在 {seconds} 秒后自动返回主页",
   },
 };
 
