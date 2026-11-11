@@ -180,6 +180,7 @@ function toFarmSummary({ farm, device, alarm, egg, silonic, userapp }, modelName
   return {
     id: farm.id,
     icon_id: farm.icon_id,
+    icon_text: farm.icon_text,
     farm_name: farm.nameFarm,
     farm_short: farm.companyName,
     house_count: Number(farm.numbOfHouse),
@@ -235,8 +236,8 @@ export async function fetchUserFarms() {
   return farms.map((farm) => toFarmSummary(farm, modelNames));
 }
 
-export function updateFarmIcon(farmId, iconId) {
-  return api.patch(`/farms/${farmId}/icon`, { icon_id: iconId }).then((res) => res.data);
+export function updateFarmIcon(farmId, iconId, iconText = "") {
+  return api.patch(`/farms/${farmId}/icon`, { icon_id: iconId, icon_text: iconText }).then((res) => res.data);
 }
 
 /* ---------- หน้า Home (mock ตัวอย่าง — ยังไม่ได้ยิง backend จริง) ---------- */

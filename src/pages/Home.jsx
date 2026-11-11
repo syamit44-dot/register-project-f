@@ -14,7 +14,14 @@ const FARM_ICONS = [
   { id: 0, name: "barn", label: "farmIconBarn" },
   { id: 1, name: "egg", label: "farmIconEgg" },
   { id: 2, name: "leaf", label: "farmIconLeaf" },
+  { id: 3, name: "home", label: "farmIconHouse" },
+  { id: 4, name: "building-warehouse", label: "farmIconWarehouse" },
+  { id: 5, name: "temperature", label: "farmIconTemperature" },
+  { id: 6, name: "building-store", label: "farmIconStore" },
+  { id: 7, name: "router", label: "farmIconController" },
 ];
+const CUSTOM_FARM_ICON_ID = 8;
+const FARM_ICON_TEXT_PATTERN = /^[A-Za-z0-9]{1,3}$/;
 
 const STATUS_TONE = {
   approved: { tint: "#e4f6ee", solid: "#1f8a5c", label: "Approved" },
@@ -59,7 +66,11 @@ function DashboardFarmCard({ farm, onOpenFarm, onOpenIconPicker }) {
           }}
           className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-[#E6F1FB] text-[#185FA5] transition-colors hover:bg-[#D6E8F8] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#185FA5]"
         >
-          <Icon name={icon.name} style={{ fontSize: 23 }} />
+          {farm.icon_id === CUSTOM_FARM_ICON_ID && farm.icon_text ? (
+            <span className="font-mono text-sm font-bold">{farm.icon_text}</span>
+          ) : (
+            <Icon name={icon.name} style={{ fontSize: 23 }} />
+          )}
         </button>
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-2">
@@ -110,6 +121,8 @@ function FarmIconPicker({ farm, onClose, onSaved }) {
   const dialogRef = useRef(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(false);
+  const [customText, setCustomText] = useState(farm.icon_text ?? "");
+  const validCustomText = FARM_ICON_TEXT_PATTERN.test(customText);
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -117,11 +130,11 @@ function FarmIconPicker({ farm, onClose, onSaved }) {
     return () => dialog.close();
   }, []);
 
-  async function pickIcon(iconId) {
+  async function pickIcon(iconId, iconText = "") {
     setSaving(true);
     setError(false);
     try {
-      const { icon_id: savedIcon } = await updateFarmIcon(farm.id, iconId);
+      const savedIcon = await updateFarmIcon(farm.id, iconId, iconText);
       onSaved(farm.id, savedIcon);
       onClose();
     } catch {
@@ -138,7 +151,7 @@ function FarmIconPicker({ farm, onClose, onSaved }) {
         event.preventDefault();
         if (!saving) onClose();
       }}
-      className="m-auto w-[min(24rem,calc(100%-2rem))] rounded-xl border border-slate-200 bg-white p-5 text-slate-900 shadow-xl backdrop:bg-slate-900/40"
+      className="m-auto w-[min(29rem,calc(100%-2rem))] rounded-xl border border-slate-200 bg-white p-5 text-slate-900 shadow-xl backdrop:bg-slate-900/40"
     >
       <div className="mb-4 flex items-start justify-between gap-4">
         <div className="min-w-0">
@@ -149,7 +162,7 @@ function FarmIconPicker({ farm, onClose, onSaved }) {
           <Icon name="x" style={{ fontSize: 18 }} />
         </button>
       </div>
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-2 gap-2 min-[420px]:grid-cols-4">
         {FARM_ICONS.map(({ id, name, label }) => (
           <button
             key={id}
@@ -164,6 +177,38 @@ function FarmIconPicker({ farm, onClose, onSaved }) {
           </button>
         ))}
       </div>
+      <form
+        className="mt-4 border-t border-slate-200 pt-4"
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (validCustomText && !saving) pickIcon(CUSTOM_FARM_ICON_ID, customText);
+        }}
+      >
+        <label htmlFor="farm-icon-text" className="text-sm font-semibold">{t("farmIconCustom")}</label>
+        <div className="mt-2 flex items-center gap-2">
+          <input
+            id="farm-icon-text"
+            type="text"
+            value={customText}
+            onChange={(event) => setCustomText(event.target.value)}
+            maxLength={3}
+            autoCapitalize="none"
+            autoComplete="off"
+            spellCheck={false}
+            disabled={saving}
+            placeholder="Ab1"
+            aria-describedby="farm-icon-text-help"
+            aria-invalid={customText !== "" && !validCustomText}
+            className="h-10 w-20 rounded-lg border border-slate-300 px-2 text-center font-mono text-sm outline-none focus:border-brand aria-invalid:border-alert"
+          />
+          <button type="submit" disabled={saving || !validCustomText} className="rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-dark disabled:opacity-50">
+            {t("save")}
+          </button>
+        </div>
+        <p id="farm-icon-text-help" className={`mt-1.5 text-xs ${customText !== "" && !validCustomText ? "text-alert" : "text-slate-500"}`}>
+          {t("farmIconCustomHelp")}
+        </p>
+      </form>
       {error && <p role="alert" className="mt-3 text-sm text-red-700">{t("farmIconSaveError")}</p>}
     </dialog>
   );
@@ -229,9 +274,9 @@ export default function Home() {
     setDetailFarm(farm);
   }
 
-  function handleIconSaved(farmId, iconId) {
+  function handleIconSaved(farmId, { icon_id, icon_text }) {
     setFarms((prev) => prev.map((farm) => (
-      farm.id === farmId ? { ...farm, icon_id: iconId } : farm
+      farm.id === farmId ? { ...farm, icon_id, icon_text } : farm
     )));
   }
 
