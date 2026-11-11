@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useBlocker, useNavigate } from "react-router-dom";
 import { AppShellStyles, SidebarNav, SignOutModal } from "../components/AppShell";
 import { clearAuth, getAuth } from "../api/auth";
@@ -42,28 +42,19 @@ const initialData = {
 };
 const emptyDraftData = JSON.stringify(initialData);
 
-function draftStorageScope() {
+function removeLegacyDraft() {
   const auth = getAuth();
   const account = auth?.token && (auth.email || auth.username);
-  return {
-    storage: account ? "localStorage" : "sessionStorage",
-    key: `farm-registration-draft:v1:${account ? encodeURIComponent(account) : "guest"}`,
-  };
-}
-
-function readDraft({ storage, key }) {
+  const key = `farm-registration-draft:v1:${account ? encodeURIComponent(account) : "guest"}`;
   try {
-    const draft = JSON.parse(window[storage].getItem(key));
-    if (Array.isArray(draft?.data?.houses) && Array.isArray(draft.data.app_users)) {
-      return draft;
-    }
+    const storage = account ? window.localStorage : window.sessionStorage;
+    storage.removeItem(key);
   } catch {
-    // A corrupt or unavailable draft should not prevent opening the form.
+    // Storage can be unavailable. The new form only uses React state.
   }
-  return null;
 }
 
-function LeaveDraftDialog({ blocker, draftSaved }) {
+function LeaveDraftDialog({ blocker }) {
   const { t } = useLanguage();
   const dialogRef = useRef(null);
 
@@ -86,7 +77,7 @@ function LeaveDraftDialog({ blocker, draftSaved }) {
     >
       <h2 id="leave-draft-title" className="text-lg font-bold">{t("leaveRegistrationTitle")}</h2>
       <p id="leave-draft-message" className="mt-2 text-sm text-ink-soft">
-        {t(draftSaved ? "leaveRegistrationSaved" : "registrationDraftUnavailable")}
+        {t("leaveRegistrationDiscard")}
       </p>
       <div className="mt-5 flex flex-wrap justify-end gap-2">
         <button type="button" onClick={() => blocker.reset()} className="rounded-lg border border-line-strong px-4 py-2 text-sm font-semibold">
@@ -143,16 +134,9 @@ function StepFooter({ onBack, onNext, nextLabel, nextIcon = "arrow-right", nextD
 export default function CustomerForm() {
   const navigate = useNavigate();
   const { t } = useLanguage();
-  const [scope] = useState(draftStorageScope);
-  const [restored] = useState(() => readDraft(scope));
-  const [current, setCurrent] = useState(() => [0, 1, 2, 3].includes(restored?.step) ? restored.step : 0);
-  const [data, setData] = useState(() => {
-    const restoredData = { ...restored?.data };
-    delete restoredData.invitation_key;
-    return { ...initialData, ...restoredData };
-  });
-  const [editor, setEditor] = useState(restored?.editor ?? null);
-  const [draftSaved, setDraftSaved] = useState(true);
+  const [current, setCurrent] = useState(0);
+  const [data, setData] = useState(initialData);
+  const [editor, setEditor] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [done, setDone] = useState(false);
@@ -162,22 +146,10 @@ export default function CustomerForm() {
   const hasDraft = !done && (editor?.dirty || JSON.stringify(data) !== emptyDraftData);
   const blocker = useBlocker(({ currentLocation, nextLocation }) => (
     Boolean(hasDraft) && !leavingViaSignOut.current
-    && (currentLocation.pathname !== nextLocation.pathname || currentLocation.search !== nextLocation.search)
+    && currentLocation.pathname !== nextLocation.pathname
   ));
 
-  useLayoutEffect(() => {
-    try {
-      const storage = window[scope.storage];
-      if (hasDraft) {
-        storage.setItem(scope.key, JSON.stringify({ data, step: current, editor }));
-      } else {
-        storage.removeItem(scope.key);
-      }
-      setDraftSaved(true);
-    } catch {
-      setDraftSaved(false);
-    }
-  }, [scope, hasDraft, data, current, editor]);
+  useEffect(removeLegacyDraft, []);
 
   useEffect(() => {
     if (!hasDraft) return;
@@ -279,12 +251,6 @@ export default function CustomerForm() {
                     </div>
                   </div>
 
-                  {hasDraft && !draftSaved && (
-                    <p role="alert" className="border-b border-line px-7 py-2.5 text-[12px] text-alert sm:px-9">
-                      {t("registrationDraftUnavailable")}
-                    </p>
-                  )}
-
                   <div className={`${current === 0 ? "block" : "hidden"}`}>
                     <Step1CustomerInfo data={data} onChange={setData} editor={editor?.type === "dealer" ? editor : null} onEditorChange={setEditor} />
                     <StepFooter onNext={next} nextLabel={t("next")} />
@@ -322,7 +288,7 @@ export default function CustomerForm() {
           onCancel={() => setSignOutConfirmOpen(false)}
           onConfirm={handleSignOut}
         />
-        {blocker.state === "blocked" && <LeaveDraftDialog blocker={blocker} draftSaved={draftSaved} />}
+        {blocker.state === "blocked" && <LeaveDraftDialog blocker={blocker} />}
       </div>
     </>
   );
