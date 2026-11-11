@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import Icon from "../components/Icon";
 import RegistrationModal from "../components/RegistrationModal";
 import { fetchUserFarms, updateFarmIcon } from "../api/client";
@@ -171,6 +171,8 @@ function FarmIconPicker({ farm, onClose, onSaved }) {
 
 export default function Home() {
   const navigate = useNavigate();
+  const { state } = useLocation();
+  const openRegistrationIfEmpty = state?.openRegistrationIfEmpty === true;
   const { t } = useLanguage();
   const [farms, setFarms] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -189,11 +191,18 @@ export default function Home() {
     }
     let active = true;
     fetchUserFarms()
-      .then((data) => { if (active) setFarms(data); })
+      .then((data) => {
+        if (!active) return;
+        if (openRegistrationIfEmpty && data.length === 0) {
+          navigate("/customer", { replace: true });
+        } else {
+          setFarms(data);
+        }
+      })
       .catch(() => { if (active) setLoadError(true); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [navigate]);
+  }, [navigate, openRegistrationIfEmpty]);
 
   function handleSignOut() {
     clearAuth();

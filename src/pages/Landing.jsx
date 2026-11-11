@@ -285,7 +285,11 @@ export default function Landing() {
         scheduleTokenRefresh();
         setIsLoginOpen(false);
         handleClearData();
-        navigate(isAdmin ? "/admin" : "/customer");
+        if (isAdmin) {
+          navigate("/admin");
+        } else {
+          navigate("/home", { state: { openRegistrationIfEmpty: true } });
+        }
       } catch (err) {
         captchaRef.current?.reset();
         setError(err?.response?.data?.message || err?.response?.data?.error || t("signinFailed"));
