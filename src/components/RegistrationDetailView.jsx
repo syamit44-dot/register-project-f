@@ -47,7 +47,7 @@ function Field({ label, value, span, labelClassName = "text-sm uppercase trackin
   return (
     <div className={span ? "col-span-2" : ""}>
       <div className={`mb-1 flex min-h-[2.25rem] items-end sm:whitespace-nowrap ${labelClassName}`}>{label}</div>
-      <div className="font-medium text-ink">{value || "-"}</div>
+      <div className="break-words font-medium text-ink">{value || "-"}</div>
     </div>
   );
 }
@@ -134,10 +134,10 @@ export default function RegistrationDetailView({ data, editable = false, draft =
       </SectionCard>
 
       <SectionCard title={t("contactPerson")}>
-        <div className="grid grid-cols-2 gap-x-4 gap-y-5 text-base sm:grid-cols-3">
+        <div className="grid gap-x-4 gap-y-5 text-base sm:grid-cols-3">
           {F(t("contactName"), "contact_name")}
           {F(t("phoneNumber"), "contact_phone")}
-          {F(t("email"), "contact_email", true)}
+          {F(t("email"), "contact_email", false, "email")}
         </div>
       </SectionCard>
 

@@ -40,11 +40,11 @@ function SectionCard({ icon, title, children, delay = 0 }) {
   );
 }
 
-function Field({ label, value, span }) {
+function Field({ label, value, span, wrap = false }) {
   return (
     <div className={span ? "col-span-2" : ""}>
       <p className="text-[12px] tracking-[0.03em] text-ink-soft">{label}</p>
-      <p className="mt-0.5 truncate text-[13.5px] text-ink">{value || "-"}</p>
+      <p className={`mt-0.5 text-[13.5px] text-ink ${wrap ? "break-words" : "truncate"}`}>{value || "-"}</p>
     </div>
   );
 }
@@ -285,10 +285,10 @@ export default function FarmDetail() {
                   </SectionCard>
 
                   <SectionCard icon="user" title={t("contactPerson")} delay={60}>
-                    <div className="grid grid-cols-2 gap-x-4 gap-y-5 sm:grid-cols-3">
+                    <div className="grid gap-x-4 gap-y-5 sm:grid-cols-3">
                       <Field label={t("contactName")} value={farm.contact_name} />
                       <Field label={t("phoneNumber")} value={farm.contact_phone} />
-                      <Field label={t("email")} value={farm.contact_email} span />
+                      <Field label={t("email")} value={farm.contact_email} wrap />
                     </div>
                   </SectionCard>
 
