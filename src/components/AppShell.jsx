@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import Icon from "./Icon";
 import { useLanguage } from "../i18n.jsx";
 import siamLogo from "../assets/images/siam-water-flame-logo.png";
@@ -63,14 +63,25 @@ export function AppShellStyles() {
   );
 }
 
-function SidebarContent({ active, onNavigate, onSignOutClick, extra, collapsed, extraNavItem }) {
+export function LoadingPanel() {
+  const { t } = useLanguage();
+  return (
+    <p role="status" className="rounded-lg border border-slate-200 bg-white p-10 text-center text-[13.5px] text-slate-500">
+      {t("loading")}
+    </p>
+  );
+}
+
+function SidebarContent({ active, onNavigate, onSignOutClick, extra, collapsed, extraNavItem, homeTo }) {
   const navigate = useNavigate();
+  const { pathname } = useLocation();
   // เติมเมนูเสริมต่อจาก Home เฉพาะตอนที่หน้านั้นส่ง extraNavItem เข้ามา (เช่น Register, Detail)
-  const navItems = extraNavItem ? [...NAV_ITEMS, extraNavItem] : NAV_ITEMS;
+  const homeItems = homeTo ? NAV_ITEMS.map((item) => ({ ...item, to: homeTo })) : NAV_ITEMS;
+  const navItems = extraNavItem ? [...homeItems, extraNavItem] : homeItems;
 
   function go(item) {
     // ถ้ากดเมนูที่ active อยู่แล้วซ้ำ ไม่ต้อง navigate ใหม่ — กันไม่ให้หน้าที่พึ่ง state ตอน navigate มา (เช่น FarmDetail) โดน reset state
-    if (item.key !== active) navigate(item.to);
+    if (item.key !== active || (homeTo && item.key === "home" && pathname !== item.to)) navigate(item.to);
     onNavigate?.();
   }
 
@@ -157,7 +168,7 @@ function SidebarContent({ active, onNavigate, onSignOutClick, extra, collapsed, 
 
 const SIDEBAR_COLLAPSE_KEY = "sidebar_collapsed";
 
-export function SidebarNav({ active = "home", mobileOpen, onClose, onSignOutClick, extra, width = "w-64", extraNavItem }) {
+export function SidebarNav({ active = "home", mobileOpen, onClose, onSignOutClick, extra, width = "w-64", extraNavItem, homeTo }) {
   // สถานะพับ/ขยายเก็บใน localStorage ให้จำไว้ข้ามหน้า/ข้ามการเปิดเว็บใหม่ — ใช้เฉพาะฝั่งเดสก์ท็อป
   const [collapsed, setCollapsed] = useState(() => {
     try {
@@ -187,7 +198,7 @@ export function SidebarNav({ active = "home", mobileOpen, onClose, onSignOutClic
           <div className="absolute -right-16 -top-16 h-56 w-56 rounded-full bg-white/5 blur-3xl" />
           <div className="absolute -bottom-24 -left-10 h-56 w-56 rounded-full bg-[#185FA5]/20 blur-3xl" />
         </div>
-        <SidebarContent active={active} onSignOutClick={onSignOutClick} extra={extra} collapsed={collapsed} extraNavItem={extraNavItem} />
+        <SidebarContent active={active} onSignOutClick={onSignOutClick} extra={extra} collapsed={collapsed} extraNavItem={extraNavItem} homeTo={homeTo} />
 
         <button
           type="button"
@@ -219,7 +230,7 @@ export function SidebarNav({ active = "home", mobileOpen, onClose, onSignOutClic
             >
               <Icon name="x" style={{ fontSize: 16 }} />
             </button>
-            <SidebarContent active={active} onNavigate={onClose} onSignOutClick={onSignOutClick} extra={extra} collapsed={false} extraNavItem={extraNavItem} />
+            <SidebarContent active={active} onNavigate={onClose} onSignOutClick={onSignOutClick} extra={extra} collapsed={false} extraNavItem={extraNavItem} homeTo={homeTo} />
           </div>
         </div>
       )}

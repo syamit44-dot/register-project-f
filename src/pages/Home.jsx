@@ -7,7 +7,7 @@ import { useFarmSummaries } from "../hooks/useFarmSummaries";
 import { fetchUserFarms, updateFarmIcon } from "../api/client";
 import { isAuthenticated, clearAuth } from "../api/auth";
 import { IconSprite } from "../components/IconSprite";
-import { AppShellStyles, SidebarNav, SignOutModal } from "../components/AppShell";
+import { AppShellStyles, LoadingPanel, SidebarNav, SignOutModal } from "../components/AppShell";
 import { useLanguage } from "../i18n.jsx";
 
 const PLATFORM_LABEL = { smartlink: "SmartLink", tempview: "TempView / FarmNet", silonic: "Silonic-Xi" };
@@ -420,9 +420,7 @@ export default function Home() {
           <div className="mx-auto flex min-h-0 w-full max-w-[1200px] flex-1 flex-col overflow-hidden px-6 pb-6 pt-16 sm:pb-8 sm:pt-8">
             {catalogError && <FarmCatalogNotice onRetry={retryCatalog} />}
             {loading ? (
-              <div className="rounded-lg border border-slate-200 bg-white p-10 text-center text-[13.5px] text-slate-500">
-                Loading data...
-              </div>
+              <LoadingPanel />
             ) : loadError ? (
               <p role="alert" className="rounded-lg border border-red-200 bg-white p-6 text-center text-sm text-red-700">
                 {t("farmListLoadError")}

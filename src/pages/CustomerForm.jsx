@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useBlocker, useNavigate, useParams } from "react-router-dom";
-import { AppShellStyles, SidebarNav, SignOutModal } from "../components/AppShell";
+import { AppShellStyles, LoadingPanel, SidebarNav, SignOutModal } from "../components/AppShell";
 import { clearAuth, getAuth } from "../api/auth";
 import StepRail from "../components/StepRail";
 import Step1CustomerInfo from "../components/Step1CustomerInfo";
@@ -134,11 +134,14 @@ function StepFooter({ onBack, onNext, nextLabel, nextIcon = "arrow-right", nextD
 
 export function FarmEditPage({ isAdmin = false }) {
   const { farmId } = useParams();
-  return <FarmEditLoader key={farmId} farmId={farmId} isAdmin={isAdmin} />;
+  return <FarmEditLoader key={`${isAdmin ? "admin" : "customer"}-${farmId}`} farmId={farmId} isAdmin={isAdmin} />;
 }
 
 function FarmEditLoader({ farmId, isAdmin }) {
   const { t } = useLanguage();
+  const navigate = useNavigate();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [signOutOpen, setSignOutOpen] = useState(false);
   const [registration, setRegistration] = useState(null);
   const [error, setError] = useState("");
   const returnTo = isAdmin ? "/admin" : "/home";
@@ -165,7 +168,52 @@ function FarmEditLoader({ farmId, isAdmin }) {
   }, [farmId, isAdmin]);
 
   if (!registration) {
-    return <div className="mx-auto max-w-xl space-y-4 p-8"><p role="status">{t(error || "loading")}</p><Link className="text-brand underline" to={returnTo}>{t("back")}</Link></div>;
+    return (
+      <>
+        <AppShellStyles />
+        <div className="flex h-screen overflow-hidden bg-gradient-to-b from-[#eef3f9] to-[#e6edf6]">
+          <SidebarNav
+            active="home"
+            homeTo={returnTo}
+            width="w-80"
+            mobileOpen={sidebarOpen}
+            onClose={() => setSidebarOpen(false)}
+            onSignOutClick={() => {
+              setSidebarOpen(false);
+              setSignOutOpen(true);
+            }}
+          />
+          <main className="min-w-0 flex-1 overflow-y-auto">
+            <button
+              type="button"
+              onClick={() => setSidebarOpen(true)}
+              aria-label={t("openMenu")}
+              className="fixed left-4 top-4 z-30 flex h-10 w-10 items-center justify-center rounded-full bg-white text-slate-600 shadow-md md:hidden"
+            >
+              <Icon name="menu" style={{ fontSize: 18 }} />
+            </button>
+            <div className="mx-auto w-full max-w-[1200px] px-6 pb-6 pt-16 sm:pb-8 sm:pt-8">
+              {error ? (
+                <div className="rounded-lg border border-slate-200 bg-white p-10 text-center text-sm text-ink-soft">
+                  <p role="status">{t(error)}</p>
+                  <Link className="mt-2 inline-block text-brand underline" to={returnTo}>{t("back")}</Link>
+                </div>
+              ) : (
+                <LoadingPanel />
+              )}
+            </div>
+          </main>
+          <SignOutModal
+            open={signOutOpen}
+            onCancel={() => setSignOutOpen(false)}
+            onConfirm={() => {
+              clearAuth();
+              navigate("/");
+            }}
+          />
+        </div>
+      </>
+    );
   }
   return <CustomerForm initialValues={registration.data} isDealer={registration.isDealer} isAdmin={isAdmin} />;
 }
