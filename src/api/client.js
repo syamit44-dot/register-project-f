@@ -160,7 +160,7 @@ export function signUp({ username, account_type, email, password, first_name, la
 
 const FARM_STATUSES = { PENDING: "pending", EDIT: "edited", APPROVE: "approved", REJECT: "rejected" };
 
-function toFarmSummary({ farm, device, alarm, egg, silonic, userapp }, modelNames) {
+export function toFarmSummary({ farm, device, alarm, egg, silonic, userapp }, modelNames) {
   const equipment = [
     ...device.map((item) => ({ ...item, modelId: item.modelTemp })),
     ...alarm.map((item) => ({ ...item, modelId: item.modelAlarm })),
@@ -233,10 +233,7 @@ export async function fetchEquipmentModels(signal) {
 
 async function fetchFarms(scope) {
   const { data: farms } = await api.get(`/get-farm/${scope}`);
-  if (farms.length === 0) return [];
-  const models = await fetchEquipmentModels();
-  const modelNames = new Map(models.map(({ id, name }) => [id, name]));
-  return farms.map((farm) => toFarmSummary(farm, modelNames));
+  return farms;
 }
 
 export function fetchUserFarms() {

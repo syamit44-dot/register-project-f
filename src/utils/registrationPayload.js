@@ -1,3 +1,5 @@
+import { validateFarmInformation } from "./registrationValidation.js";
+
 const equipmentFields = [
   { output: "device", enabled: "model_enabled", models: "device_models", communication: "device_communication", modelField: "modelTemp", serialField: "controllerSN" },
   { output: "alarm", enabled: "alarm_enabled", models: "alarms", communication: "alarm_communication", modelField: "modelAlarm", serialField: "serialNumber" },
@@ -5,7 +7,12 @@ const equipmentFields = [
   { output: "egg", enabled: "egg_enabled", models: "egg_models", communication: "egg_communication", modelField: "modelEgg", serialField: "serialNumber" },
 ];
 
-export class RegistrationInputError extends Error {}
+export class RegistrationInputError extends Error {
+  constructor(message, step) {
+    super(message);
+    this.step = step;
+  }
+}
 
 export const APP_USERNAME_MAX_LENGTH = 50;
 
@@ -31,6 +38,9 @@ export function appUserCounts(users) {
 }
 
 export function registrationPayload(data, t, isDealer = false, original = null) {
+  const farmError = validateFarmInformation(data, t);
+  if (farmError) throw new RegistrationInputError(farmError, 0);
+
   const equipment = { device: [], alarm: [], silonic: [], egg: [] };
   const appModelIds = new Set();
 
@@ -38,7 +48,7 @@ export function registrationPayload(data, t, isDealer = false, original = null) 
     const enabled = equipmentFields.filter((field) => house[field.enabled]);
     const houseName = house.name || `House ${index + 1}`;
     if (enabled.length === 0) {
-      throw new RegistrationInputError(t("registrationHouseNeedsEquipment", { house: houseName }));
+      throw new RegistrationInputError(t("registrationHouseNeedsEquipment", { house: houseName }), 1);
     }
     for (const field of enabled) {
       const item = house[field.models]?.[0];
@@ -47,7 +57,7 @@ export function registrationPayload(data, t, isDealer = false, original = null) 
       const needsSmartlinkSerial = field.output === "device" && type === "SMARTLINK";
       if (!item?.model_id || !item.serial_number?.trim() || !type
         || (needsSmartlinkSerial && !house.smartlink_serial_number?.trim())) {
-        throw new RegistrationInputError(t("registrationHouseIncomplete", { house: houseName }));
+        throw new RegistrationInputError(t("registrationHouseIncomplete", { house: houseName }), 1);
       }
       const row = {
         house: String(index + 1),
@@ -78,23 +88,23 @@ export function registrationPayload(data, t, isDealer = false, original = null) 
     usersByModel.get(model).push(user);
   }
   for (const [model, users] of usersByModel) {
-    if (!appModelIds.has(model)) throw new RegistrationInputError(t("registrationUserNeedsController"));
+    if (!appModelIds.has(model)) throw new RegistrationInputError(t("registrationUserNeedsController"), 2);
     const counts = appUserCounts(users);
     const previous = appUserCounts(original?.app_users.filter((user) => String(user.device_model) === model) ?? []);
     if (counts.main > Math.max(MAIN_APP_USERS_PER_MODEL, previous.main)) {
-      throw new RegistrationInputError(t("userLimitWarning"));
+      throw new RegistrationInputError(t("userLimitWarning"), 2);
     }
     if (counts.superusers > Math.max(1, previous.superusers)) {
-      throw new RegistrationInputError(t("appSuperuserLimit"));
+      throw new RegistrationInputError(t("appSuperuserLimit"), 2);
     }
-    if (counts.distributors > Number(isDealer)) throw new RegistrationInputError(t("dealerAppUserLimit"));
+    if (counts.distributors > Number(isDealer)) throw new RegistrationInputError(t("dealerAppUserLimit"), 2);
   }
 
   const userapp = appUsers.map((user) => {
     const model = String(user.device_model ?? "");
     const previous = original?.app_users.find((item) => item.id === user.id || (!user.id && item.username === user.username));
     if (previous?.username !== user.username && !isValidAppUsername(user.username)) {
-      throw new RegistrationInputError(t("registrationAppUsernameInvalid"));
+      throw new RegistrationInputError(t("registrationAppUsernameInvalid"), 2);
     }
     return {
       username: user.username,

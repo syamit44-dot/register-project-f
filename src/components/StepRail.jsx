@@ -1,7 +1,7 @@
 import Icon from "./Icon";
 import { useLanguage } from "../i18n.jsx";
 
-export default function StepRail({ current, onGoTo }) {
+export default function StepRail({ current, completedSteps, onGoTo }) {
   const { t } = useLanguage();
 
   const steps = [
@@ -16,12 +16,13 @@ export default function StepRail({ current, onGoTo }) {
       <div className="editorial-steps-list">
         {steps.map((step, i) => {
           const isActive = i === current;
-          const isDone = i < current;
+          const isDone = i < completedSteps && !isActive;
 
           return (
             <button
               type="button"
               key={i}
+              aria-current={isActive ? "step" : undefined}
               onClick={() => onGoTo(i)}
               className={`editorial-step group ${isActive ? "is-active" : ""} ${isDone ? "is-done" : ""}`}
             >

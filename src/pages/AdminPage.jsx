@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Icon from "../components/Icon";
 import RegistrationModal from "../components/RegistrationModal";
+import FarmCatalogNotice from "../components/FarmCatalogNotice";
+import { useFarmSummaries } from "../hooks/useFarmSummaries";
 import { SignOutModal } from "../components/AppShell";
 import { clearAuth } from "../api/auth";
 import { changeRegistrationStatus, deleteRegistration, listRegistrations } from "../api/client";
@@ -173,7 +175,8 @@ function FarmRow({ row, index, t, deleteMode, selected, onToggleSelect, onReview
 export default function AdminPage() {
   const navigate = useNavigate();
   const { t } = useLanguage();
-  const [rows, setRows] = useState([]);
+  const [records, setRecords] = useState([]);
+  const { farms: rows, catalogError, retryCatalog } = useFarmSummaries(records);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [actionError, setActionError] = useState("");
@@ -182,7 +185,7 @@ export default function AdminPage() {
   useEffect(() => {
     let active = true;
     listRegistrations()
-      .then((data) => { if (active) setRows(data); })
+      .then((data) => { if (active) setRecords(data); })
       .catch(() => { if (active) setLoadError(true); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
@@ -253,10 +256,10 @@ export default function AdminPage() {
     setPendingAction(true);
     setActionError("");
     try {
-      await changeRegistrationStatus(id, action);
-      setRows((prev) => prev.map((row) => row.id === id ? {
-        ...row, status: action === "approve" ? "approved" : "rejected",
-      } : row));
+      const { status } = await changeRegistrationStatus(id, action);
+      setRecords((prev) => prev.map((record) => (
+        record.farm.id === id ? { ...record, farm: { ...record.farm, status } } : record
+      )));
       setDetailId(null);
     } catch {
       setActionError(t("farmAdminActionError"));
@@ -282,7 +285,7 @@ export default function AdminPage() {
     setActionError("");
     const results = await Promise.allSettled(selectedDeleteIds.map((id) => deleteRegistration(id)));
     const deleted = new Set(selectedDeleteIds.filter((_, index) => results[index].status === "fulfilled"));
-    setRows((prev) => prev.filter((row) => !deleted.has(row.id)));
+    setRecords((prev) => prev.filter((record) => !deleted.has(record.farm.id)));
     setSelectedDeleteIds((prev) => prev.filter((id) => !deleted.has(id)));
     if (deleted.size === selectedDeleteIds.length) {
       setDeleteMode(false);
@@ -555,6 +558,7 @@ export default function AdminPage() {
           {/* รายการฟาร์ม — เฉพาะส่วนนี้เท่านั้นที่เลื่อนได้ */}
           <div className="admin-scroll min-h-0 flex-1 overflow-y-auto">
             <div className="mx-auto w-full max-w-[1500px] px-5 pb-6 sm:px-8">
+              {catalogError && <FarmCatalogNotice onRetry={retryCatalog} />}
               {loading ? (
                 <p role="status" className="p-6 text-sm text-ink-soft">{t("loading")}</p>
               ) : loadError ? (

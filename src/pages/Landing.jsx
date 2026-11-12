@@ -1323,9 +1323,7 @@ export default function Landing() {
                       </form>
                       {!(authMode === "Sign Up" && signupStep === "account") && (
                         <div className="auth-footer-hint">
-                          {page === "admin"
-                            ? "Administrator access is limited to authorized personnel."
-                            : "Your information is securely handled by the registration system."}
+                          {t(page === "admin" ? "adminSignInFooter" : "customerSignInFooter")}
                         </div>
                       )}
                       {page !== "admin" && authMode === "Sign Up" && (

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useBlocker, useNavigate, useParams } from "react-router-dom";
 import { AppShellStyles, SidebarNav, SignOutModal } from "../components/AppShell";
 import { clearAuth, getAuth } from "../api/auth";
@@ -10,7 +10,7 @@ import Step4Confirm from "../components/Step4Confirm";
 import Icon from "../components/Icon";
 import { createRegistration, fetchEquipmentModels, getRegistration, updateRegistration } from "../api/client";
 import { useLanguage } from "../i18n.jsx";
-import { registrationErrorMessage, registrationPayload } from "../utils/registrationPayload";
+import { RegistrationInputError, registrationErrorMessage, registrationPayload } from "../utils/registrationPayload";
 import { registrationFormData } from "../utils/registrationModels";
 
 const initialData = {
@@ -178,6 +178,16 @@ export default function CustomerForm({ initialValues = initialData, isDealer = g
   const [current, setCurrent] = useState(0);
   const [data, setData] = useState(initialValues);
   const [editor, setEditor] = useState(null);
+  const [showValidation, setShowValidation] = useState(false);
+  const scrollRef = useRef(null);
+  const validation = useMemo(() => {
+    try {
+      return { payload: registrationPayload(data, t, isDealer, editing ? initialValues : null) };
+    } catch (error) {
+      if (!(error instanceof RegistrationInputError)) throw error;
+      return { error };
+    }
+  }, [data, editing, initialValues, isDealer, t]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [done, setDone] = useState(false);
@@ -233,6 +243,12 @@ export default function CustomerForm({ initialValues = initialData, isDealer = g
 
   async function handleSubmit() {
     setError("");
+    if (validation.error) {
+      setShowValidation(true);
+      setCurrent(validation.error.step);
+      scrollRef.current?.scrollTo({ top: 0 });
+      return;
+    }
     if (!editing && !data.pdpa_consent) {
       setError(t("pdpaConsentRequired"));
       return;
@@ -240,7 +256,7 @@ export default function CustomerForm({ initialValues = initialData, isDealer = g
 
     setSubmitting(true);
     try {
-      const payload = registrationPayload(data, t, isDealer, editing ? initialValues : null);
+      const { payload } = validation;
       if (editing) {
         await updateRegistration(payload, isAdmin);
         allowLeave.current = true;
@@ -283,7 +299,7 @@ export default function CustomerForm({ initialValues = initialData, isDealer = g
             <Icon name="menu" style={{ fontSize: 18 }} />
           </button>
 
-          <div className="min-h-0 flex-1 overflow-y-auto">
+          <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
             {done ? (
               <div className="grid grid-cols-1 px-6 pb-20 pt-16 sm:pt-12">
                 <div className="mx-auto w-full max-w-[600px] overflow-hidden rounded-xl border border-slate-200 bg-white">
@@ -319,9 +335,15 @@ export default function CustomerForm({ initialValues = initialData, isDealer = g
                     </h1>
                     {editing && <Link className="mb-4 inline-block text-sm font-semibold text-white underline" to={returnTo}>{t("cancel")}</Link>}
                     <div className="editorial-step-nav">
-                      <StepRail current={current} onGoTo={setCurrent} />
+                      <StepRail current={current} completedSteps={validation.error?.step ?? 3} onGoTo={setCurrent} />
                     </div>
                   </div>
+
+                  {showValidation && validation.error?.step === current && (
+                    <p role="alert" className="mx-7 mt-4 rounded-lg bg-alert-tint px-4 py-3 text-sm text-alert sm:mx-9">
+                      {validation.error.message}
+                    </p>
+                  )}
 
                   <div className={`${current === 0 ? "block" : "hidden"}`}>
                     <Step1CustomerInfo data={data} onChange={setData} editor={editor?.type === "dealer" ? editor : null} onEditorChange={setEditor} />

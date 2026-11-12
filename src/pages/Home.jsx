@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import Icon from "../components/Icon";
 import RegistrationModal from "../components/RegistrationModal";
+import FarmCatalogNotice from "../components/FarmCatalogNotice";
+import { useFarmSummaries } from "../hooks/useFarmSummaries";
 import { fetchUserFarms, updateFarmIcon } from "../api/client";
 import { isAuthenticated, clearAuth } from "../api/auth";
 import { IconSprite } from "../components/IconSprite";
@@ -220,14 +222,16 @@ export default function Home() {
   const { state } = useLocation();
   const openRegistrationIfEmpty = state?.openRegistrationIfEmpty === true;
   const { t } = useLanguage();
-  const [farms, setFarms] = useState([]);
+  const [records, setRecords] = useState([]);
+  const { farms, catalogError, retryCatalog } = useFarmSummaries(records);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [signOutConfirmOpen, setSignOutConfirmOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [detailFarm, setDetailFarm] = useState(null);
+  const [detailId, setDetailId] = useState(null);
+  const detailFarm = farms.find((farm) => farm.id === detailId);
   const [iconFarm, setIconFarm] = useState(null);
 
   useEffect(() => {
@@ -242,7 +246,7 @@ export default function Home() {
         if (openRegistrationIfEmpty && data.length === 0) {
           navigate("/customer", { replace: true });
         } else {
-          setFarms(data);
+          setRecords(data);
         }
       })
       .catch(() => { if (active) setLoadError(true); })
@@ -272,12 +276,12 @@ export default function Home() {
   // เปิดดู/แก้ไขรายละเอียดฟาร์มแบบป็อปอัพ — ใช้ RegistrationModal ตัวเดียวกับฝั่ง Admin
   // (canModerate=false: ไม่มีปุ่ม Reject/Approve แต่ยังกด Edit + Save ได้ตามปกติ)
   function handleOpenFarm(farm) {
-    setDetailFarm(farm);
+    setDetailId(farm.id);
   }
 
   function handleIconSaved(farmId, { icon_id, icon_text }) {
-    setFarms((prev) => prev.map((farm) => (
-      farm.id === farmId ? { ...farm, icon_id, icon_text } : farm
+    setRecords((prev) => prev.map((record) => (
+      record.farm.id === farmId ? { ...record, farm: { ...record.farm, icon_id, icon_text } } : record
     )));
   }
 
@@ -414,6 +418,7 @@ export default function Home() {
           </button>
 
           <div className="mx-auto flex min-h-0 w-full max-w-[1200px] flex-1 flex-col overflow-hidden px-6 pb-6 pt-16 sm:pb-8 sm:pt-8">
+            {catalogError && <FarmCatalogNotice onRetry={retryCatalog} />}
             {loading ? (
               <div className="rounded-lg border border-slate-200 bg-white p-10 text-center text-[13.5px] text-slate-500">
                 Loading data...
@@ -483,7 +488,7 @@ export default function Home() {
 
         <RegistrationModal
           registration={detailFarm}
-          onClose={() => setDetailFarm(null)}
+          onClose={() => setDetailId(null)}
           onEdit={(id) => navigate(`/customer/edit/${id}`)}
           canModerate={false}
           title={t("farmDetailModalTitle")}
