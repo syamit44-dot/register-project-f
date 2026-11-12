@@ -35,6 +35,7 @@ export function registrationFormData(registration, catalog) {
   const contact = farm.saleContract ?? {};
   return {
     id: farm.id,
+    date_edit: farm.date_edit ?? null,
     farm_name: farm.nameFarm,
     farm_short: farm.companyName ?? "",
     house_count: houses.length,

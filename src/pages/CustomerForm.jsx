@@ -189,6 +189,7 @@ export default function CustomerForm({ initialValues = initialData, isDealer = g
     }
   }, [data, editing, initialValues, isDealer, t]);
   const [submitting, setSubmitting] = useState(false);
+  const [editConflict, setEditConflict] = useState(false);
   const [error, setError] = useState("");
   const [done, setDone] = useState(false);
   const [secondsRemaining, setSecondsRemaining] = useState(RETURN_HOME_SECONDS);
@@ -242,6 +243,7 @@ export default function CustomerForm({ initialValues = initialData, isDealer = g
   }
 
   async function handleSubmit() {
+    if (editConflict) return;
     setError("");
     if (validation.error) {
       setShowValidation(true);
@@ -266,7 +268,11 @@ export default function CustomerForm({ initialValues = initialData, isDealer = g
         setDone(true);
       }
     } catch (err) {
-      setError(registrationErrorMessage(err, t));
+      if (editing && err.response?.status === 409 && err.response.data?.code === "farm_edit_conflict") {
+        setEditConflict(true);
+      } else {
+        setError(registrationErrorMessage(err, t));
+      }
     } finally {
       setSubmitting(false);
     }
@@ -362,12 +368,20 @@ export default function CustomerForm({ initialValues = initialData, isDealer = g
 
                   <div className={`${current === 3 ? "block" : "hidden"}`}>
                     <Step4Confirm data={data} onChange={setData} onGoTo={setCurrent} />
+                    {editConflict && (
+                      <div className="mx-7 mb-4 rounded-lg bg-alert-tint px-4 py-3 text-sm text-alert sm:mx-9">
+                        <p role="alert">{t("farmEditConflict")}</p>
+                        <Link to="." target="_blank" rel="noopener" className="mt-2 inline-block font-semibold underline">
+                          {t("farmEditOpenLatest")}
+                        </Link>
+                      </div>
+                    )}
                     <StepFooter
                       onBack={back}
                       onNext={handleSubmit}
                       nextLabel={submitting ? t("submitting") : t(editing ? "save" : "submit")}
                       nextIcon="check"
-                      nextDisabled={submitting || (editing && !hasDraft)}
+                      nextDisabled={submitting || editConflict || (editing && !hasDraft)}
                       error={error}
                     />
                   </div>

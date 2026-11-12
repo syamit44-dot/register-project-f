@@ -118,7 +118,7 @@ export function registrationPayload(data, t, isDealer = false, original = null) 
 
   return {
     farm: {
-      ...(original ? { id: original.id } : {}),
+      ...(original ? { id: original.id, date_edit: original.date_edit } : {}),
       nameFarm: farmName,
       companyName: data.farm_short.trim(),
       numbOfHouse: String(data.house_count),
