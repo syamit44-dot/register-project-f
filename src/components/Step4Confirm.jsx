@@ -184,7 +184,8 @@ export default function Step4Confirm({ data, onChange, onGoTo }) {
     .join(" ");
 
   const dealerContactParts = summarizeDealerContact(data, t);
-  const houses = data.houses ?? [];
+  const houseCount = Number(data.house_count);
+  const houses = useMemo(() => data.houses.slice(0, houseCount), [data.houses, houseCount]);
   const appUsers = data.app_users ?? [];
   const selectedModels = useMemo(() => getSelectedAppModels(houses), [houses]);
   const userGroups = useMemo(
@@ -227,7 +228,7 @@ export default function Step4Confirm({ data, onChange, onGoTo }) {
             <dl className="grid gap-x-4 gap-y-2.5 sm:grid-cols-2 lg:grid-cols-3">
               <InfoRow label={t("farmNameCompany")} value={data.farm_name} fallback={t("notProvided")} />
               <InfoRow label={t("companyName")} value={data.farm_short} fallback={t("notProvided")} />
-              <InfoRow label={t("numberOfHouses")} value={`${data.house_count} ${t("house")}${Number(data.house_count) > 1 ? "s" : ""}`} fallback={t("notProvided")} />
+              <InfoRow label={t("numberOfHouses")} value={t(houseCount === 1 ? "houseCountOne" : "houseCountMany", { count: houseCount })} fallback={t("notProvided")} />
               <InfoRow label={t("timezone")} value={data.timezone} fallback={t("notProvided")} />
               <InfoRow label={t("address")} value={fullAddress} fallback={t("notProvided")} className="lg:col-span-2" />
             </dl>

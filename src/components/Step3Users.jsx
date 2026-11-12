@@ -14,7 +14,10 @@ export default function Step3Users({ data, onChange, isDealer, allowModelChange 
   // (ไม่ต้องระบุใน state ก็ถือว่าขยายอยู่ ยกเว้นจะถูกเพิ่มลง collapsedGroups)
   const [collapsedGroups, setCollapsedGroups] = useState(() => new Set());
 
-  const selectedModels = useMemo(() => getSelectedAppModels(data.houses), [data.houses]);
+  const selectedModels = useMemo(
+    () => getSelectedAppModels(data.houses.slice(0, Number(data.house_count))),
+    [data.houses, data.house_count],
+  );
 
   const visibleGroups = useMemo(() => {
     const groups = new Map(Array.from(selectedModels, ([key, label]) => [key, { key, label, users: [] }]));

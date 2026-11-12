@@ -1,4 +1,4 @@
-import { validateFarmInformation } from "./registrationValidation.js";
+import { isValidRegistrationEmail, validateFarmInformation } from "./registrationValidation.js";
 
 const equipmentFields = [
   { output: "device", enabled: "model_enabled", models: "device_models", communication: "device_communication", modelField: "modelTemp", serialField: "controllerSN" },
@@ -44,7 +44,11 @@ export function registrationPayload(data, t, isDealer = false, original = null) 
   const equipment = { device: [], alarm: [], silonic: [], egg: [] };
   const appModelIds = new Set();
 
-  data.houses.forEach((house, index) => {
+  const houseCount = Number(data.house_count);
+  if (data.houses.length < houseCount) {
+    throw new RegistrationInputError(t("registrationHouseNeedsEquipment", { house: `House ${data.houses.length + 1}` }), 1);
+  }
+  data.houses.slice(0, houseCount).forEach((house, index) => {
     const enabled = equipmentFields.filter((field) => house[field.enabled]);
     const houseName = house.name || `House ${index + 1}`;
     if (enabled.length === 0) {
@@ -106,13 +110,17 @@ export function registrationPayload(data, t, isDealer = false, original = null) 
     if (previous?.username !== user.username && !isValidAppUsername(user.username)) {
       throw new RegistrationInputError(t("registrationAppUsernameInvalid"), 2);
     }
+    const email = user.email?.trim() || null;
+    if (email && email !== previous?.email && !isValidRegistrationEmail(email)) {
+      throw new RegistrationInputError(t("registrationInvalidAppEmail", { username: user.username }), 2);
+    }
     return {
       username: user.username,
       ...(previous ? { id: previous.id } : {}),
       deviceModel: Number(model),
       userType: user.user_type === "super" ? "Superuser" : "Normaluser",
       isDealer: Boolean(user.is_dealer),
-      userEmail: user.email?.trim() || null,
+      userEmail: email,
     };
   });
 

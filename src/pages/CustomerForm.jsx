@@ -196,7 +196,8 @@ export default function CustomerForm({ initialValues = initialData, isDealer = g
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [signOutConfirmOpen, setSignOutConfirmOpen] = useState(false);
   const allowLeave = useRef(false);
-  const hasDraft = !done && (editor?.dirty || JSON.stringify(data) !== JSON.stringify(initialValues));
+  const activeData = { ...data, houses: data.houses.slice(0, Number(data.house_count)) };
+  const hasDraft = !done && (editor?.dirty || JSON.stringify(activeData) !== JSON.stringify(initialValues));
   const blocker = useBlocker(({ currentLocation, nextLocation }) => (
     Boolean(hasDraft) && !allowLeave.current
     && currentLocation.pathname !== nextLocation.pathname

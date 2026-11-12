@@ -5,28 +5,67 @@ const STORAGE_KEY = "farm_auth";
 
 // อ่าน claim "exp" (unix seconds) จาก JWT แบบไม่ verify signature — ใช้แค่กะเวลาต่ออายุฝั่ง client
 // เท่านั้น การตรวจสอบจริงทำที่ backend เสมอ
-function decodeJwtExpiry(token) {
+function decodeJwtClaims(token) {
   try {
     const payload = token.split(".")[1];
-    const json = atob(payload.replace(/-/g, "+").replace(/_/g, "/"));
-    const { exp } = JSON.parse(json);
-    return typeof exp === "number" ? exp * 1000 : null;
+    return JSON.parse(atob(payload.replace(/-/g, "+").replace(/_/g, "/"))) ?? {};
   } catch {
-    return null;
+    return {};
   }
 }
 
+function decodeJwtExpiry(token) {
+  const { exp } = decodeJwtClaims(token);
+  return typeof exp === "number" ? exp * 1000 : null;
+}
+
+function accountKey(auth) {
+  if (!auth?.token) return null;
+  const { uid } = decodeJwtClaims(auth.token);
+  return uid ?? auth.username ?? auth.email ?? auth.token;
+}
+
+let tabAccount = accountKey(readStoredAuth());
+let accountChanged = false;
+
+function markAccountChanged() {
+  if (accountChanged) return;
+  accountChanged = true;
+  window.dispatchEvent(new Event("auth:changed"));
+}
+
+export function checkAuthSession() {
+  if (accountKey(readStoredAuth()) !== tabAccount) markAccountChanged();
+  return !accountChanged;
+}
+
+window.addEventListener("storage", (event) => {
+  if (event.key !== STORAGE_KEY && event.key !== null) return;
+  // Storage events preserve intermediate changes even if the original account signs in again.
+  try {
+    if (accountKey(JSON.parse(event.newValue)) !== tabAccount) markAccountChanged();
+  } catch {
+    markAccountChanged();
+  }
+});
+
 export function saveAuth({ username, email, token, first_name, last_name, account_type = "customer" }) {
   const data = { username, email, token, first_name, last_name, account_type, expiresAt: decodeJwtExpiry(token) };
+  if (!checkAuthSession()) throw new Error("The account changed in another tab.");
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  tabAccount = accountKey(data);
   return data;
 }
 
 // ใช้ตอน /api/refresh ได้ access token ใหม่มา — อัปเดตแค่ token/expiresAt เก็บฟิลด์อื่นไว้เหมือนเดิม
 export function updateAccessToken(newToken, accountType) {
   const current = getAuth();
-  if (!current) return null;
+  if (!current || !checkAuthSession()) return null;
   const next = { ...current, account_type: accountType ?? current.account_type, token: newToken, expiresAt: decodeJwtExpiry(newToken) };
+  if (accountKey(next) !== tabAccount) {
+    markAccountChanged();
+    return null;
+  }
   localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
   return next;
 }
@@ -38,14 +77,12 @@ function isValidJwtFormat(token) {
   return typeof token === "string" && token.split(".").length === 3;
 }
 
-export function getAuth() {
+function readStoredAuth() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
     const data = JSON.parse(raw);
     if (data?.token && !isValidJwtFormat(data.token)) {
-      // token รูปแบบผิด (ไม่ใช่ JWT) — เคลียร์ทิ้งแทนที่จะปล่อยให้แนบไปกับทุก request แล้วพังซ้ำ
-      localStorage.removeItem(STORAGE_KEY);
       return null;
     }
     return data;
@@ -54,12 +91,19 @@ export function getAuth() {
   }
 }
 
+export function getAuth() {
+  const auth = readStoredAuth();
+  return !accountChanged && accountKey(auth) === tabAccount ? auth : null;
+}
+
 export function getToken() {
   return getAuth()?.token ?? null;
 }
 
 export function clearAuth() {
+  if (!checkAuthSession()) return;
   localStorage.removeItem(STORAGE_KEY);
+  tabAccount = null;
 }
 
 export function isAuthenticated() {

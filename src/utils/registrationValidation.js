@@ -16,7 +16,9 @@ const requiredFarmFields = {
   dealer_name: "dealerName",
 };
 
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+export function isValidRegistrationEmail(email) {
+  return email.length <= 50 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
 
 export function validateFarmInformation(data, t) {
   for (const [field, label] of Object.entries(requiredFarmFields)) {
@@ -26,7 +28,7 @@ export function validateFarmInformation(data, t) {
   if (dialCode && data.contact_phone.trim() === `+${dialCode}`) {
     return t("registrationRequiredField", { field: t("phoneNumber") });
   }
-  if (!EMAIL_PATTERN.test(data.contact_email.trim())) return t("registrationInvalidContactEmail");
+  if (!isValidRegistrationEmail(data.contact_email.trim())) return t("registrationInvalidContactEmail");
   if (![data.dealer_contact_phone, data.dealer_contact_line, data.dealer_contact_email, data.dealer_contact_other_value]
     .some((value) => value?.trim())) {
     return t("registrationRequiredField", { field: t("dealerContact") });

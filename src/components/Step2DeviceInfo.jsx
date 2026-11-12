@@ -314,7 +314,11 @@ export default function Step2DeviceInfo({ active, data, onChange, editor, onEdit
     </div>
   );
 
-  const houses = useMemo(() => (data.houses ?? []).map(normalizeHouse), [data.houses]);
+  const expectedHouseCount = Number(data.house_count);
+  const houses = useMemo(
+    () => data.houses.slice(0, expectedHouseCount).map(normalizeHouse),
+    [data.houses, expectedHouseCount],
+  );
   const isBulkEditing = editingIndex === null && draft !== null;
   const enabledEquipment = draft ? [
     draft.model_enabled ? draft.device_models : null,
@@ -323,21 +327,15 @@ export default function Step2DeviceInfo({ active, data, onChange, editor, onEdit
     draft.egg_enabled ? draft.egg_models : null,
   ].filter(Boolean) : [];
   const canCopy = copyTargets.length > 0 && enabledEquipment.length > 0 && enabledEquipment.every((models) => models.length > 0);
-  const expectedHouseCount = Math.max(1, Number.parseInt(data.house_count, 10) || 1);
 
   useEffect(() => {
-    const currentCount = (data.houses ?? []).length;
-    if (currentCount === expectedHouseCount) return;
+    const currentCount = data.houses.length;
+    if (currentCount >= expectedHouseCount) return;
 
-    const nextHouses = Array.from({ length: expectedHouseCount }, (_, index) => {
-      const existing = data.houses?.[index] ?? {};
-      return {
-        ...existing,
-        name: existing.name || `House ${index + 1}`,
-      };
-    });
-
-    onChange({ ...data, houses: nextHouses });
+    const addedHouses = Array.from({ length: expectedHouseCount - currentCount }, (_, index) => ({
+      name: `House ${currentCount + index + 1}`,
+    }));
+    onChange({ ...data, houses: [...data.houses, ...addedHouses] });
   }, [data, expectedHouseCount, onChange]);
 
   function openEditor(index) {

@@ -1,5 +1,5 @@
 import axios from "axios";
-import { getToken, getAuth, updateAccessToken, clearAuth } from "./auth";
+import { checkAuthSession, getToken, getAuth, updateAccessToken, clearAuth } from "./auth";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000/api";
 
@@ -14,6 +14,7 @@ export const api = axios.create({
 // แนบ JWT access token (จาก /signin) ไปกับทุก request อัตโนมัติ — endpoint ที่ต้อง login ถึงจะเรียกได้
 // (เช่น เปลี่ยนรหัสผ่าน) ต้องมี header นี้ ปรับ scheme ให้ตรงกับ authentication.py ฝั่ง Django ถ้าไม่ใช่ Bearer
 api.interceptors.request.use((config) => {
+  if (!checkAuthSession()) throw new Error("The account changed in another tab.");
   const token = getToken();
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
@@ -37,12 +38,14 @@ function requestNewAccessToken() {
       .then((res) => {
         const newToken = res.data?.access_token;
         if (!newToken) throw new Error("No access_token in /refresh response");
-        updateAccessToken(newToken, res.data?.account_type);
+        if (!updateAccessToken(newToken, res.data?.account_type)) {
+          throw new Error("The refresh token belongs to a different session.");
+        }
         return newToken;
       })
       .catch((err) => {
         // A failed connection does not invalidate the signed-in account.
-        if (err.response?.status === 401) {
+        if (err.response?.status === 401 && checkAuthSession()) {
           clearAuth();
           window.dispatchEvent(new Event("auth:expired"));
         }
@@ -75,8 +78,12 @@ export function scheduleTokenRefresh() {
 scheduleTokenRefresh();
 
 api.interceptors.response.use(
-  (res) => res,
+  (res) => {
+    if (!checkAuthSession()) throw new Error("The account changed in another tab.");
+    return res;
+  },
   async (error) => {
+    if (!checkAuthSession()) throw error;
     const { config, response } = error;
     const shouldSkip =
       !config || !getToken() || config._retry || NO_REFRESH_PATHS.some((p) => config.url?.includes(p));
