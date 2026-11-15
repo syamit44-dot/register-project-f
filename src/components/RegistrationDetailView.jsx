@@ -103,29 +103,31 @@ export default function RegistrationDetailView({ data }) {
           {F(t("numberOfHouses"), "house_count")}
         </div>
 
-        {data.platform === "tempview" && (
-          <p className="mt-4 text-[11.5px] text-ink-soft">{t("tempViewNoSnHint")}</p>
-        )}
-
         <div className="my-5 border-t border-mist" />
 
         <SubLabel className="text-sm normal-case tracking-normal text-ink">{t("houseDetailsTitle")}</SubLabel>
         <div className="space-y-2">
           {(data.houses || []).map((house) => (
-            <div key={house.serial_number || house.id || house.name} className="rounded-control border border-line bg-mist px-4 py-3 text-base">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="font-semibold text-ink">{house.name}</div>
-                {house.serial_number && <div className="mono text-sm text-ink-soft">{house.serial_number}</div>}
-              </div>
-              {house.accessories && house.accessories.length > 0 && (
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  {house.accessories.map((a) => (
-                    <span key={a} className="rounded-control border border-line bg-white px-2 py-0.5 text-sm text-ink-soft">
-                      {a}
-                    </span>
-                  ))}
-                </div>
-              )}
+            <div key={house.id} className="rounded-control border border-line bg-mist px-4 py-3 text-base">
+              <h4 className="font-semibold text-ink">{house.name}</h4>
+              <ul className="mt-2 divide-y divide-line">
+                {house.equipment.map((item) => (
+                  <li key={item.id} className="grid grid-cols-2 gap-x-4 gap-y-1 py-2 text-sm sm:grid-cols-4">
+                    <span className="col-span-2 min-w-0 break-words font-medium text-ink sm:col-span-1">{item.model}</span>
+                    <span className="text-ink-soft">{PLATFORM_LABEL[item.platform] || item.platform || t("notSpecified")}</span>
+                    <dl className="min-w-0">
+                      <dt className="text-xs text-ink-soft">{t("serialNumber")}</dt>
+                      <dd className="break-words font-mono text-ink">{item.serialNumber || "-"}</dd>
+                    </dl>
+                    {item.platform === "smartlink" && item.smartlinkSerial && (
+                      <dl className="min-w-0">
+                        <dt className="text-xs text-ink-soft">{t("smartlinkSnLabel")}</dt>
+                        <dd className="break-words font-mono text-ink">{item.smartlinkSerial}</dd>
+                      </dl>
+                    )}
+                  </li>
+                ))}
+              </ul>
             </div>
           ))}
           {(!data.houses || data.houses.length === 0) && (

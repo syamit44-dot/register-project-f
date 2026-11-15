@@ -177,12 +177,16 @@ export function toFarmSummary({ farm, device, alarm, egg, silonic, userapp }, mo
   const houses = new Map();
   for (const item of equipment) {
     if (!houses.has(item.house)) {
-      houses.set(item.house, { id: item.house, name: `House ${item.house}`, accessories: [] });
+      houses.set(item.house, { id: item.house, name: `House ${item.house}`, equipment: [] });
     }
     const house = houses.get(item.house);
-    const serial = item.controllerSN || item.serialNumber;
-    house.serial_number ||= serial;
-    house.accessories.push([modelNames.get(item.modelId) ?? item.modelId, serial].filter(Boolean).join(" · "));
+    house.equipment.push({
+      id: `${item.modelId}-${item.id}`,
+      model: modelNames.get(item.modelId) ?? item.modelId,
+      platform: item.type?.toLowerCase(),
+      serialNumber: item.controllerSN || item.serialNumber,
+      smartlinkSerial: item.smartlinkSN,
+    });
   }
   const platforms = new Set(equipment.map((item) => item.type.toLowerCase()));
 

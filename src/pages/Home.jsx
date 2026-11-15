@@ -52,7 +52,7 @@ function DashboardFarmCard({ farm, onOpenFarm, onOpenIconPicker }) {
   const { t } = useLanguage();
   const tone = STATUS_TONE[farm.status] || STATUS_TONE.pending;
   const icon = FARM_ICONS.find(({ id }) => id === farm.icon_id) ?? FARM_ICONS[0];
-  const deviceCount = (farm.houses || []).reduce((s, h) => s + (h.accessories?.length || 0), 0);
+  const deviceCount = (farm.houses || []).reduce((s, h) => s + h.equipment.length, 0);
   const userCount = (farm.app_users || []).length;
 
   return (
@@ -288,7 +288,7 @@ export default function Home() {
   // สถิติรวมทั้งระบบ — ใช้แสดงในการ์ดสรุปของโหมด Dashboard เท่านั้น
   const totalHouses = farms.reduce((sum, f) => sum + (Number(f.house_count) || 0), 0);
   const totalDevices = farms.reduce(
-    (sum, f) => sum + (f.houses || []).reduce((s, h) => s + (h.accessories?.length || 0), 0),
+    (sum, f) => sum + (f.houses || []).reduce((s, h) => s + h.equipment.length, 0),
     0
   );
   const totalUsers = farms.reduce((sum, f) => sum + (f.app_users?.length || 0), 0);

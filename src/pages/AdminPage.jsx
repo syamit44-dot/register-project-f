@@ -85,7 +85,7 @@ function RowMetric({ value, label }) {
 
 // แถวฟาร์มหนึ่งรายการ — เต็มความกว้าง หนึ่งฟาร์มต่อหนึ่งบรรทัด พื้นขาว
 function FarmRow({ row, index, t, deleteMode, selected, onToggleSelect, onReview }) {
-  const deviceCount = (row.houses || []).reduce((s, h) => s + (h.accessories?.length || 0), 0);
+  const deviceCount = (row.houses || []).reduce((s, h) => s + h.equipment.length, 0);
   const userCount = (row.app_users || []).length;
 
   return (
