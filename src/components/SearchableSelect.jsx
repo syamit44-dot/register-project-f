@@ -10,12 +10,14 @@ export default function SearchableSelect({ label, required, value, options, onCh
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState(null);
   const [highlight, setHighlight] = useState(-1);
+  const [hoveredOption, setHoveredOption] = useState(null);
   const selected = options.find((option) => option.value === value);
   const selectedLabel = selected?.label ?? valueLabel ?? "";
   const search = (query ?? "").trim().toLowerCase();
   const matches = options.filter(({ label, keywords }) => (
     label.toLowerCase().includes(search) || keywords?.toLowerCase().includes(search)
   ));
+  const describedOption = hoveredOption ?? matches[highlight];
 
   useEffect(() => {
     if (open && highlight >= 0) {
@@ -25,6 +27,7 @@ export default function SearchableSelect({ label, required, value, options, onCh
 
   function choose(option) {
     onChange(option);
+    setHoveredOption(null);
     setOpen(false);
   }
 
@@ -32,9 +35,11 @@ export default function SearchableSelect({ label, required, value, options, onCh
     if (event.key === "Escape" && open) {
       event.preventDefault();
       event.stopPropagation();
+      setHoveredOption(null);
       setOpen(false);
     } else if (event.key === "ArrowDown" || event.key === "ArrowUp") {
       event.preventDefault();
+      setHoveredOption(null);
       if (!open) {
         setQuery(null);
         setOpen(true);
@@ -95,7 +100,10 @@ export default function SearchableSelect({ label, required, value, options, onCh
               if (searchable) event.currentTarget.select();
             }
           }}
-          onBlur={() => setOpen(false)}
+          onBlur={() => {
+            setHoveredOption(null);
+            setOpen(false);
+          }}
           onKeyDown={handleKeyDown}
           onChange={(event) => {
             setQuery(event.target.value);
@@ -110,22 +118,36 @@ export default function SearchableSelect({ label, required, value, options, onCh
         />
         <Icon name="chevron-down" className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-ink-soft" style={{ fontSize: 14 }} />
         {open && (
-          <ul id={listId} role="listbox" aria-label={label || placeholder} className="absolute z-20 mt-1.5 max-h-48 w-full overflow-auto rounded-xl border border-line-strong bg-white py-1 shadow-lg">
-            {matches.map((option, index) => (
-              <li
-                key={option.value}
-                id={`${listId}-${index}`}
-                role="option"
-                aria-selected={option.value === value}
-                onMouseDown={(event) => event.preventDefault()}
-                onClick={() => choose(option)}
-                className={`cursor-pointer px-3 py-2 text-sm text-ink hover:bg-brand-tint ${index === highlight ? "bg-brand-tint" : ""}`}
-              >
-                {option.label}
-              </li>
-            ))}
-            {matches.length === 0 && <li className="px-3 py-2 text-sm text-ink-soft">{t("dropdownNoResults")}</li>}
-          </ul>
+          <div className="absolute z-20 mt-1.5 w-full rounded-xl border border-line-strong bg-white shadow-lg">
+            <ul id={listId} role="listbox" aria-label={label || placeholder} className="max-h-48 overflow-auto rounded-xl py-1">
+              {matches.map((option, index) => (
+                <li
+                  key={option.value}
+                  id={`${listId}-${index}`}
+                  role="option"
+                  aria-description={option.description}
+                  aria-selected={option.value === value}
+                  onPointerEnter={option.description ? () => setHoveredOption(option) : undefined}
+                  onPointerLeave={option.description ? () => setHoveredOption(null) : undefined}
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => choose(option)}
+                  className={`flex cursor-pointer items-center justify-between gap-2 px-3 py-2 text-sm text-ink hover:bg-brand-tint ${index === highlight ? "bg-brand-tint" : ""}`}
+                >
+                  {option.label}
+                  {option.description && (
+                    <span aria-hidden="true" className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-line-strong bg-white text-xs font-bold text-brand-dark">!</span>
+                  )}
+                </li>
+              ))}
+              {matches.length === 0 && <li className="px-3 py-2 text-sm text-ink-soft">{t("dropdownNoResults")}</li>}
+            </ul>
+            {describedOption?.description && (
+              <p aria-hidden="true" className="rounded-b-xl border-t border-line bg-brand-tint px-3 py-2 text-xs leading-5 text-ink">
+                <span className="block font-semibold">{describedOption.label}</span>
+                {describedOption.description}
+              </p>
+            )}
+          </div>
         )}
       </div>
       {error && <p id={errorId} className="mt-1.5 text-[13px] font-medium text-alert">{error}</p>}
