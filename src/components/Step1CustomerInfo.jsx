@@ -200,7 +200,7 @@ export default function Step1CustomerInfo({ data, onChange, editor, onEditorChan
 
         <SectionHeading icon="building-store" title={t("address")} />
         <div className="grid gap-x-6 gap-y-6 md:grid-cols-2">
-          <Field label={t("address")} required className="md:col-span-2">
+          <Field label={t("address")} className="md:col-span-2">
             <input
               className={inputClass}
               placeholder=" 123 Main Street"
@@ -208,13 +208,13 @@ export default function Step1CustomerInfo({ data, onChange, editor, onEditorChan
               onChange={set("address")}
             />
           </Field>
-          <Field label={t("subdistrict")} required>
+          <Field label={t("subdistrict")}>
             <input className={inputClass} value={data.subdistrict} onChange={set("subdistrict")} />
           </Field>
-          <Field label={t("district")} required>
+          <Field label={t("district")}>
             <input className={inputClass} value={data.district} onChange={set("district")} />
           </Field>
-          <Field label={t("province")} required>
+          <Field label={t("province")}>
             <input className={inputClass} value={data.province} onChange={set("province")} />
           </Field>
           <Field label={t("country")} required>
@@ -245,7 +245,7 @@ export default function Step1CustomerInfo({ data, onChange, editor, onEditorChan
               )}
             </div>
           </Field>
-          <Field label={t("postalCode")} required>
+          <Field label={t("postalCode")}>
             <input className={inputClass} value={data.postal_code} onChange={set("postal_code")} />
           </Field>
           <Field label={t("timezone")} required>

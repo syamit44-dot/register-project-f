@@ -3,12 +3,7 @@ import countryData from "../data/countryData.js";
 const requiredFarmFields = {
   farm_name: "farmName",
   farm_short: "companyName",
-  address: "address",
-  subdistrict: "subdistrict",
-  district: "district",
-  province: "province",
   country: "country",
-  postal_code: "postalCode",
   timezone: "timezone",
   contact_name: "contactName",
   contact_phone: "phoneNumber",

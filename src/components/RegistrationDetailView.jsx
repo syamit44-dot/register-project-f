@@ -50,6 +50,8 @@ function Field({ label, value }) {
 export default function RegistrationDetailView({ data }) {
   const { t } = useLanguage();
   const F = (label, key) => <Field label={label} value={data[key]} />;
+  const addressLine = [data.address, [data.subdistrict, data.district].filter(Boolean).join(" ")].filter(Boolean).join(", ");
+  const locality = [[data.province, data.postal_code].filter(Boolean).join(" "), data.country].filter(Boolean).join(", ");
 
   return (
     <>
@@ -82,10 +84,8 @@ export default function RegistrationDetailView({ data }) {
         <div className="my-5 border-t border-mist" />
 
         <div className="rounded-control bg-mist px-4 py-3.5 text-sm leading-6 text-ink">
-          {data.address}, {data.subdistrict} {data.district}
-          <br />
-          {data.province} {data.postal_code}, {data.country}
-          <span className="ml-1">, {t("timezone")} {data.timezone || "-"}</span>
+          {addressLine && <div>{addressLine}</div>}
+          {[locality, `${t("timezone")} ${data.timezone || "-"}`].filter(Boolean).join(", ")}
         </div>
       </SectionCard>
 
