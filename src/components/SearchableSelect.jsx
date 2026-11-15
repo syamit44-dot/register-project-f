@@ -2,7 +2,7 @@ import { useEffect, useId, useState } from "react";
 import Icon from "./Icon";
 import { useLanguage } from "../i18n.jsx";
 
-export default function SearchableSelect({ label, required, value, options, onChange, placeholder, disabled, valueLabel, compact = false, error }) {
+export default function SearchableSelect({ label, required, value, options, onChange, placeholder, disabled, valueLabel, compact = false, error, searchable = true }) {
   const { t } = useLanguage();
   const inputId = useId();
   const listId = `${inputId}-list`;
@@ -43,7 +43,11 @@ export default function SearchableSelect({ label, required, value, options, onCh
         const next = event.key === "ArrowDown" ? highlight + 1 : highlight < 0 ? matches.length - 1 : highlight - 1;
         setHighlight((next + matches.length) % matches.length);
       }
-    } else if (event.key === "Enter" && open) {
+    } else if (!searchable && !open && (event.key === "Enter" || event.key === " ")) {
+      event.preventDefault();
+      setOpen(true);
+      setHighlight(options.findIndex((option) => option.value === value));
+    } else if (open && (event.key === "Enter" || (!searchable && event.key === " "))) {
       event.preventDefault();
       const option = matches[highlight] ?? matches[0];
       if (option) choose(option);
@@ -66,7 +70,7 @@ export default function SearchableSelect({ label, required, value, options, onCh
           role="combobox"
           aria-label={label || placeholder}
           aria-expanded={open}
-          aria-autocomplete="list"
+          aria-autocomplete={searchable ? "list" : "none"}
           aria-controls={open ? listId : undefined}
           aria-activedescendant={open && matches[highlight] ? `${listId}-${highlight}` : undefined}
           aria-required={required}
@@ -74,20 +78,21 @@ export default function SearchableSelect({ label, required, value, options, onCh
           aria-describedby={error ? errorId : undefined}
           autoComplete="off"
           disabled={disabled}
+          readOnly={!searchable}
           value={open ? query ?? selectedLabel : selectedLabel}
           placeholder={placeholder}
           onFocus={(event) => {
             setQuery(null);
             setHighlight(-1);
             setOpen(true);
-            event.currentTarget.select();
+            if (searchable) event.currentTarget.select();
           }}
           onClick={(event) => {
             if (!open) {
               setQuery(null);
               setHighlight(-1);
               setOpen(true);
-              event.currentTarget.select();
+              if (searchable) event.currentTarget.select();
             }
           }}
           onBlur={() => setOpen(false)}
@@ -97,7 +102,7 @@ export default function SearchableSelect({ label, required, value, options, onCh
             setHighlight(-1);
             setOpen(true);
           }}
-          className={`w-full rounded-xl border bg-white py-2 pr-9 text-ink shadow-sm outline-none transition focus:ring-4 disabled:bg-mist disabled:text-ink-soft ${
+          className={`w-full rounded-xl border bg-white py-2 pr-9 text-ink shadow-sm outline-none transition focus:ring-4 disabled:bg-mist disabled:text-ink-soft ${searchable ? "" : "cursor-pointer"} ${
             error ? "border-alert focus:ring-alert-tint" : "border-line-strong hover:border-brand/50 focus:border-brand focus:ring-brand-tint"
           } ${
             compact ? "h-10 pl-3 text-sm" : "h-11 pl-3.5 text-[13.5px]"

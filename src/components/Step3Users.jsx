@@ -10,6 +10,7 @@ const UNASSIGNED = "__unassigned__";
 export default function Step3Users({ data, onChange, isDealer, allowModelChange = false }) {
   const { t } = useLanguage();
   const [showUserInfo, setShowUserInfo] = useState(false);
+  const [roleHelpIndex, setRoleHelpIndex] = useState(null);
   // เก็บสถานะ ย่อ/ขยาย ของแต่ละกลุ่มด้วย key ของกลุ่ม — ค่าเริ่มต้นคือ "ขยาย" ทุกกลุ่ม
   // (ไม่ต้องระบุใน state ก็ถือว่าขยายอยู่ ยกเว้นจะถูกเพิ่มลง collapsedGroups)
   const [collapsedGroups, setCollapsedGroups] = useState(() => new Set());
@@ -92,6 +93,7 @@ export default function Step3Users({ data, onChange, isDealer, allowModelChange 
   }
 
   function removeUser(index) {
+    setRoleHelpIndex(null);
     onChange({ ...data, app_users: data.app_users.filter((_, i) => i !== index) });
   }
 
@@ -148,7 +150,8 @@ export default function Step3Users({ data, onChange, isDealer, allowModelChange 
               </div>
               <div>
                 <p className="font-semibold">{t("UserType")}</p>
-                <p>{t("userTypeInfo")}</p>
+                <p>{t("userTypeNormal")}. {t("userTypeNormalInfo")}</p>
+                <p>{t("userTypeSuper")}. {t("userTypeSuperInfo")}</p>
               </div>
             </div>
           </div>
@@ -204,6 +207,8 @@ export default function Step3Users({ data, onChange, isDealer, allowModelChange 
                           const invalidUsername = Boolean(u.username) && u.username !== u.original_username && !isValidAppUsername(u.username);
                           const canSelectSuper = u.is_dealer || u.user_type === "super" || counts.superusers === 0;
                           const usernameErrorId = `app-username-error-${u.index}`;
+                          const roleHelpId = `app-user-role-help-${u.index}`;
+                          const showRoleHelp = roleHelpIndex === u.index;
                           return (
                             <div
                               className="grid gap-3 rounded-xl border border-line bg-mist/50 p-3.5 md:grid-cols-[1fr_1fr_1fr_auto]"
@@ -253,16 +258,32 @@ export default function Step3Users({ data, onChange, isDealer, allowModelChange 
                                 )}
                               </div>
                               <div>
-                                <SearchableSelect
-                                  label={t("UserType")}
-                                  compact
-                                  value={u.user_type}
-                                  options={[
-                                    { value: "normal", label: t("userTypeNormal") },
-                                    ...(canSelectSuper ? [{ value: "super", label: t("userTypeSuper") }] : []),
-                                  ]}
-                                  onChange={({ value }) => setUserField(u.index, "user_type", value)}
-                                />
+                                <div className="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-2">
+                                  <SearchableSelect
+                                    label={t("UserType")}
+                                    compact
+                                    searchable={false}
+                                    value={u.user_type}
+                                    options={[
+                                      { value: "normal", label: t("userTypeNormal") },
+                                      ...(canSelectSuper ? [{ value: "super", label: t("userTypeSuper") }] : []),
+                                    ]}
+                                    onChange={({ value }) => setUserField(u.index, "user_type", value)}
+                                  />
+                                  <button
+                                    type="button"
+                                    className="mb-2 inline-flex h-6 w-6 items-center justify-center rounded-full border border-line-strong bg-white text-xs font-bold text-brand-dark hover:bg-brand-tint focus-visible:outline-brand"
+                                    aria-label={t("viewUserTypeInfo")}
+                                    aria-expanded={showRoleHelp}
+                                    aria-controls={roleHelpId}
+                                    onClick={() => setRoleHelpIndex(showRoleHelp ? null : u.index)}
+                                  >
+                                    !
+                                  </button>
+                                </div>
+                                <p id={roleHelpId} hidden={!showRoleHelp} className="mt-2 rounded-lg bg-brand-tint px-2.5 py-2 text-xs text-ink">
+                                  {t(u.user_type === "super" ? "userTypeSuperInfo" : "userTypeNormalInfo")}
+                                </p>
                               </div>
                               <div>
                                 <label className="mb-1 block text-[12px] font-semibold text-ink-soft">
