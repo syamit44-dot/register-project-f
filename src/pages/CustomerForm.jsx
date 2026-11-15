@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Link, useBlocker, useNavigate, useParams } from "react-router-dom";
 import { AppShellStyles, LoadingPanel, SidebarNav, SignOutModal } from "../components/AppShell";
 import { clearAuth, getAuth } from "../api/auth";
@@ -51,11 +51,40 @@ function removeLegacyDraft() {
     const storage = account ? window.localStorage : window.sessionStorage;
     storage.removeItem(key);
   } catch {
-    // Storage can be unavailable. The new form only uses React state.
+    // Storage can be unavailable.
   }
 }
 
-function LeaveDraftDialog({ blocker }) {
+function registrationDraftKey(farmId, isAdmin) {
+  const auth = getAuth();
+  const account = auth?.token ? auth.email || auth.username : null;
+  const form = farmId ? `${isAdmin ? "admin" : "customer"}:${farmId}` : "new";
+  return `farm-registration-draft:v2:${encodeURIComponent(JSON.stringify([account, form]))}`;
+}
+
+function readDraft(key) {
+  try {
+    const draft = JSON.parse(window.sessionStorage.getItem(key));
+    if (draft && Array.isArray(draft.data?.houses) && Array.isArray(draft.data.app_users)
+      && Number.isInteger(draft.step) && draft.step >= 0 && draft.step <= 3) {
+      return draft;
+    }
+  } catch {
+    // Start from the server or the empty form if browser storage cannot be read.
+  }
+  return null;
+}
+
+function storeDraft(key, draft) {
+  try {
+    if (draft) window.sessionStorage.setItem(key, JSON.stringify(draft));
+    else window.sessionStorage.removeItem(key);
+  } catch {
+    // Continue editing in memory when browser storage is unavailable.
+  }
+}
+
+function LeaveDraftDialog({ blocker, onDiscard }) {
   const { t } = useLanguage();
   const dialogRef = useRef(null);
 
@@ -84,7 +113,10 @@ function LeaveDraftDialog({ blocker }) {
         <button type="button" onClick={() => blocker.reset()} className="rounded-lg border border-line-strong px-4 py-2 text-sm font-semibold">
           {t("stayOnRegistration")}
         </button>
-        <button type="button" onClick={() => blocker.proceed()} className="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white">
+        <button type="button" onClick={() => {
+          onDiscard();
+          blocker.proceed();
+        }} className="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white">
           {t("leaveRegistration")}
         </button>
       </div>
@@ -223,9 +255,11 @@ export default function CustomerForm({ initialValues = initialData, isDealer = g
   const { t } = useLanguage();
   const editing = Boolean(initialValues.id);
   const returnTo = isAdmin ? "/admin" : "/home";
-  const [current, setCurrent] = useState(0);
-  const [data, setData] = useState(initialValues);
-  const [editor, setEditor] = useState(null);
+  const [draftKey] = useState(() => registrationDraftKey(initialValues.id, isAdmin));
+  const [restoredDraft] = useState(() => readDraft(draftKey));
+  const [current, setCurrent] = useState(restoredDraft?.step ?? 0);
+  const [data, setData] = useState(restoredDraft?.data ?? initialValues);
+  const [editor, setEditor] = useState(restoredDraft?.editor ?? null);
   const [showValidation, setShowValidation] = useState(false);
   const scrollRef = useRef(null);
   const validation = useMemo(() => {
@@ -237,7 +271,9 @@ export default function CustomerForm({ initialValues = initialData, isDealer = g
     }
   }, [data, editing, initialValues, isDealer, t]);
   const [submitting, setSubmitting] = useState(false);
-  const [editConflict, setEditConflict] = useState(false);
+  const [editConflict, setEditConflict] = useState(
+    () => editing && Boolean(restoredDraft) && restoredDraft.data.date_edit !== initialValues.date_edit,
+  );
   const [error, setError] = useState("");
   const [done, setDone] = useState(false);
   const [secondsRemaining, setSecondsRemaining] = useState(RETURN_HOME_SECONDS);
@@ -252,6 +288,20 @@ export default function CustomerForm({ initialValues = initialData, isDealer = g
   ));
 
   useEffect(removeLegacyDraft, []);
+
+  useLayoutEffect(() => {
+    if (allowLeave.current) return;
+    storeDraft(draftKey, hasDraft ? { data, editor, step: current } : null);
+  }, [current, data, draftKey, editor, hasDraft]);
+
+  useEffect(() => {
+    function discardOnAccountChange() {
+      allowLeave.current = true;
+      storeDraft(draftKey, null);
+    }
+    window.addEventListener("auth:changed", discardOnAccountChange);
+    return () => window.removeEventListener("auth:changed", discardOnAccountChange);
+  }, [draftKey]);
 
   useEffect(() => {
     if (!done) return;
@@ -271,6 +321,7 @@ export default function CustomerForm({ initialValues = initialData, isDealer = g
   useEffect(() => {
     if (!hasDraft) return;
     function beforeUnload(event) {
+      if (allowLeave.current) return;
       event.preventDefault();
       event.returnValue = "";
     }
@@ -285,8 +336,13 @@ export default function CustomerForm({ initialValues = initialData, isDealer = g
     if (current > 0) setCurrent(current - 1);
   }
 
-  function handleSignOut() {
+  function discardDraft() {
     allowLeave.current = true;
+    storeDraft(draftKey, null);
+  }
+
+  function handleSignOut() {
+    discardDraft();
     clearAuth();
     navigate("/");
   }
@@ -310,10 +366,13 @@ export default function CustomerForm({ initialValues = initialData, isDealer = g
       const { payload } = validation;
       if (editing) {
         await updateRegistration(payload, isAdmin);
-        allowLeave.current = true;
+        if (allowLeave.current) return;
+        discardDraft();
         navigate(returnTo, { replace: true });
       } else {
         await createRegistration(payload);
+        if (allowLeave.current) return;
+        discardDraft();
         setDone(true);
       }
     } catch (err) {
@@ -445,7 +504,7 @@ export default function CustomerForm({ initialValues = initialData, isDealer = g
           onCancel={() => setSignOutConfirmOpen(false)}
           onConfirm={handleSignOut}
         />
-        {blocker.state === "blocked" && <LeaveDraftDialog blocker={blocker} />}
+        {blocker.state === "blocked" && <LeaveDraftDialog blocker={blocker} onDiscard={discardDraft} />}
       </div>
     </>
   );
