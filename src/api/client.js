@@ -25,13 +25,15 @@ api.interceptors.request.use((config) => {
 /* ---------- Auto-refresh access token ---------- */
 // endpoint พวกนี้ต้องไม่พยายาม refresh ซ้ำเมื่อโดน 401/403
 // (signin/signup ผิด credential จริงๆ, check-key ผิดรหัสจริงๆ, refresh เองพังแล้วก็คือพังเลย)
-const NO_REFRESH_PATHS = ["/signin", "/signup", "/refresh", "/check-key"];
+const NO_REFRESH_PATHS = ["/signin", "/signup", "/refresh", "/check-key", "/logout"];
 
 let refreshPromise = null;
+let signOutPromise = null;
 
 // เรียก POST /api/refresh (ใช้ cookie refresh_token, ไม่ต้องส่ง body) เพื่อขอ access token ใหม่
 // กันเรียกซ้อนกันหลายรอบด้วย refreshPromise เดียว ถ้ามีหลาย request โดน 401 พร้อมกัน
 function requestNewAccessToken() {
+  if (signOutPromise) return Promise.reject(new Error("Sign out is in progress."));
   if (!refreshPromise) {
     refreshPromise = api
       .post("/refresh")
@@ -45,7 +47,7 @@ function requestNewAccessToken() {
       })
       .catch((err) => {
         // A failed connection does not invalidate the signed-in account.
-        if (err.response?.status === 401 && checkAuthSession()) {
+        if (err.response?.status === 401 && !signOutPromise && getToken() && checkAuthSession()) {
           clearAuth();
           window.dispatchEvent(new Event("auth:expired"));
         }
@@ -63,6 +65,7 @@ function requestNewAccessToken() {
 let refreshTimer = null;
 export function scheduleTokenRefresh() {
   if (refreshTimer) clearTimeout(refreshTimer);
+  if (signOutPromise) return;
   const auth = getAuth();
   if (!auth?.token || !auth?.expiresAt) return;
   const msUntilRefresh = auth.expiresAt - Date.now() - 60_000; // ต่ออายุล่วงหน้า 60 วิ
@@ -76,6 +79,21 @@ export function scheduleTokenRefresh() {
 }
 // เผื่อกรณีรีเฟรชหน้าเว็บแล้วยังมี session ค้างอยู่ใน localStorage
 scheduleTokenRefresh();
+
+export function signOut() {
+  if (!signOutPromise) {
+    clearTimeout(refreshTimer);
+    signOutPromise = api.post("/logout", null, { timeout: 5000 })
+      .catch(() => {
+        // The local account can still be cleared when the API is unavailable.
+      })
+      .finally(() => {
+        clearAuth();
+        signOutPromise = null;
+      });
+  }
+  return signOutPromise;
+}
 
 api.interceptors.response.use(
   (res) => {

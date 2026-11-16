@@ -4,8 +4,8 @@ import Icon from "../components/Icon";
 import RegistrationModal from "../components/RegistrationModal";
 import FarmCatalogNotice from "../components/FarmCatalogNotice";
 import { useFarmSummaries } from "../hooks/useFarmSummaries";
-import { fetchUserFarms, updateFarmIcon } from "../api/client";
-import { isAuthenticated, clearAuth } from "../api/auth";
+import { fetchUserFarms, signOut, updateFarmIcon } from "../api/client";
+import { isAuthenticated } from "../api/auth";
 import { IconSprite } from "../components/IconSprite";
 import { AppShellStyles, LoadingPanel, SidebarNav, SignOutModal } from "../components/AppShell";
 import { useLanguage } from "../i18n.jsx";
@@ -258,9 +258,9 @@ export default function Home() {
     return () => { active = false; };
   }, [navigate, openRegistrationIfEmpty]);
 
-  function handleSignOut() {
-    clearAuth();
-    navigate("/");
+  async function handleSignOut() {
+    await signOut();
+    navigate("/", { replace: true });
   }
 
   const filteredFarms = useMemo(() => {

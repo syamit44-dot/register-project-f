@@ -1,15 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { checkAuthSession } from "./api/auth";
 import { useLanguage } from "./i18n.jsx";
-import { createHashRouter, Outlet, RouterProvider } from "react-router-dom";
+import { createHashRouter, Navigate, Outlet, RouterProvider } from "react-router-dom";
 import IconSprite from "./components/IconSprite";
 import Landing from "./pages/Landing";
 import CustomerForm, { FarmEditPage } from "./pages/CustomerForm";
 import AdminPage from "./pages/AdminPage";
 import Home from "./pages/Home";
 import AccountPage from "./pages/AccountPage";
-import HouseDetail from "./pages/HouseDetail";
-import FarmDetail from "./pages/FarmDetail";
 
 function AccountChangedDialog() {
   const { t } = useLanguage();
@@ -53,8 +51,8 @@ const router = createHashRouter([{
     { path: "/admin", element: <AdminPage /> },
     { path: "/admin/farms/:farmId/edit", element: <FarmEditPage isAdmin /> },
     { path: "/home", element: <Home /> },
-    { path: "/home/house/:index", element: <HouseDetail /> },
-    { path: "/home/farm", element: <FarmDetail /> },
+    { path: "/home/house/:index", element: <Navigate to="/home" replace /> },
+    { path: "/home/farm", element: <Navigate to="/home" replace /> },
     { path: "/account", element: <AccountPage /> },
     { path: "*", element: null },
   ],

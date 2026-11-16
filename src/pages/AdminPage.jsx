@@ -5,8 +5,7 @@ import RegistrationModal from "../components/RegistrationModal";
 import FarmCatalogNotice from "../components/FarmCatalogNotice";
 import { useFarmSummaries } from "../hooks/useFarmSummaries";
 import { SignOutModal } from "../components/AppShell";
-import { clearAuth } from "../api/auth";
-import { changeRegistrationStatus, deleteRegistration, listRegistrations } from "../api/client";
+import { changeRegistrationStatus, deleteRegistration, listRegistrations, signOut } from "../api/client";
 import { useLanguage } from "../i18n.jsx";
 
 const PLATFORM_LABEL = { smartlink: "SmartLink", tempview: "TempView / FarmNet" };
@@ -296,9 +295,9 @@ export default function AdminPage() {
     setPendingAction(false);
   }
 
-  function handleSignOut() {
-    clearAuth();
-    navigate("/");
+  async function handleSignOut() {
+    await signOut();
+    navigate("/", { replace: true });
   }
 
   return (

@@ -1,14 +1,14 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Link, useBlocker, useNavigate, useParams } from "react-router-dom";
 import { AppShellStyles, LoadingPanel, SidebarNav, SignOutModal } from "../components/AppShell";
-import { clearAuth, getAuth } from "../api/auth";
+import { getAuth } from "../api/auth";
 import StepRail from "../components/StepRail";
 import Step1CustomerInfo from "../components/Step1CustomerInfo";
 import Step2DeviceInfo from "../components/Step2DeviceInfo";
 import Step3Users from "../components/Step3Users";
 import Step4Confirm from "../components/Step4Confirm";
 import Icon from "../components/Icon";
-import { createRegistration, fetchEquipmentModels, getRegistration, updateRegistration } from "../api/client";
+import { createRegistration, fetchEquipmentModels, getRegistration, signOut, updateRegistration } from "../api/client";
 import { useLanguage } from "../i18n.jsx";
 import { RegistrationInputError, registrationErrorMessage, registrationPayload } from "../utils/registrationPayload";
 import { registrationFormData } from "../utils/registrationModels";
@@ -238,9 +238,9 @@ function FarmEditLoader({ farmId, isAdmin }) {
           <SignOutModal
             open={signOutOpen}
             onCancel={() => setSignOutOpen(false)}
-            onConfirm={() => {
-              clearAuth();
-              navigate("/");
+            onConfirm={async () => {
+              await signOut();
+              navigate("/", { replace: true });
             }}
           />
         </div>
@@ -344,10 +344,10 @@ export default function CustomerForm({ initialValues = initialData, isDealer = g
     storeDraft(draftKey, null);
   }
 
-  function handleSignOut() {
+  async function handleSignOut() {
     discardDraft();
-    clearAuth();
-    navigate("/");
+    await signOut();
+    navigate("/", { replace: true });
   }
 
   async function handleSubmit() {

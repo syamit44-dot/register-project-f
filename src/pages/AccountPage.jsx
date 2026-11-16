@@ -3,7 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { AppShellStyles, SidebarNav, SignOutModal } from "../components/AppShell";
 import { IconSprite } from "../components/IconSprite";
 import Icon from "../components/Icon";
-import { getAuth, clearAuth } from "../api/auth";
+import { getAuth } from "../api/auth";
+import { signOut } from "../api/client";
 import { useLanguage } from "../i18n.jsx";
 
 function maskEmail(email) {
@@ -30,9 +31,9 @@ export default function AccountPage() {
   const [signOutConfirmOpen, setSignOutConfirmOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  function handleSignOut() {
-    clearAuth();
-    navigate("/");
+  async function handleSignOut() {
+    await signOut();
+    navigate("/", { replace: true });
   }
 
   const fullName = [auth?.first_name, auth?.last_name].filter(Boolean).join(" ") || "-";
