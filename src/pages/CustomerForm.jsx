@@ -392,7 +392,7 @@ export default function CustomerForm({ initialValues = initialData, isDealer = g
       <div className="editorial-page flex h-screen overflow-hidden">
         <SidebarNav
           active="register"
-          extraNavItem={{ key: "register", label: "Register", icon: "clipboard-text", to: "/customer" }}
+          extraNavItem={{ key: "register", labelKey: "newRegister", icon: "clipboard-text", to: "/customer" }}
           width="w-80"
           mobileOpen={sidebarOpen}
           onClose={() => setSidebarOpen(false)}

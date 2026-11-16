@@ -10,7 +10,7 @@ import chaFlag from "../assets/icon/CHA.png";
 // เมนูฝั่งซ้าย — ค่าเริ่มต้นมีแค่ Home
 // เมนูเสริม (เช่น Register บนหน้า CustomerForm, Detail บนหน้า FarmDetail) ไม่ได้อยู่ในลิสต์นี้ตรงๆ
 // เพราะขึ้นเฉพาะบางหน้า — แต่ละหน้าส่งเข้ามาเองผ่าน prop `extraNavItem` ของ SidebarNav แทน
-export const NAV_ITEMS = [{ key: "home", label: "Home", icon: "home", to: "/home" }];
+export const NAV_ITEMS = [{ key: "home", labelKey: "navHome", icon: "home", to: "/home" }];
 
 // ชุดตัวเลือกภาษาเดียวกับหน้า Landing เป๊ะๆ (รูปธง + โค้ด 3 ตัวอักษร)
 const LANG_OPTIONS = [
@@ -73,6 +73,7 @@ export function LoadingPanel() {
 }
 
 function SidebarContent({ active, onNavigate, onSignOutClick, extra, collapsed, extraNavItem, homeTo }) {
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const { pathname } = useLocation();
   // เติมเมนูเสริมต่อจาก Home เฉพาะตอนที่หน้านั้นส่ง extraNavItem เข้ามา (เช่น Register, Detail)
@@ -98,12 +99,13 @@ function SidebarContent({ active, onNavigate, onSignOutClick, extra, collapsed, 
       <nav className="mt-1 space-y-1.5 px-3">
         {navItems.map((item) => {
           const isActive = item.key === active;
+          const label = item.labelKey ? t(item.labelKey) : item.label;
           return (
             <button
               key={item.key}
               type="button"
               onClick={() => go(item)}
-              title={collapsed ? item.label : undefined}
+              title={collapsed ? label : undefined}
               className={`app-nav-item relative flex w-full items-center overflow-hidden rounded-xl py-2.5 text-left text-[14px] font-medium ${
                 collapsed ? "justify-center px-0" : "gap-3 px-3"
               } ${isActive ? "bg-[#0C4A82] text-white shadow-[0_6px_16px_rgba(0,0,0,0.18)]" : "text-white/70 hover:bg-white/5 hover:text-white"}`}
@@ -116,7 +118,7 @@ function SidebarContent({ active, onNavigate, onSignOutClick, extra, collapsed, 
               >
                 <Icon name={item.icon} style={{ fontSize: 16 }} />
               </span>
-              {!collapsed && <span className={isActive ? "font-semibold" : ""}>{item.label}</span>}
+              {!collapsed && <span className={isActive ? "font-semibold" : ""}>{label}</span>}
             </button>
           );
         })}
@@ -134,7 +136,7 @@ function SidebarContent({ active, onNavigate, onSignOutClick, extra, collapsed, 
             navigate("/account");
             onNavigate?.();
           }}
-          title={collapsed ? "Account" : undefined}
+          title={collapsed ? t("navAccount") : undefined}
           className={`flex w-full items-center rounded-xl py-2.5 text-left text-[14px] font-medium transition duration-200 ${
             collapsed ? "justify-center px-0" : "gap-3 px-3"
           } ${active === "account" ? "bg-[#0C4A82] text-white" : "text-white/70 hover:bg-white/5 hover:text-white"}`}
@@ -146,12 +148,12 @@ function SidebarContent({ active, onNavigate, onSignOutClick, extra, collapsed, 
           >
             <Icon name="user" style={{ fontSize: 16 }} />
           </span>
-          {!collapsed && <span className={active === "account" ? "font-semibold" : ""}>Account</span>}
+          {!collapsed && <span className={active === "account" ? "font-semibold" : ""}>{t("navAccount")}</span>}
         </button>
         <button
           type="button"
           onClick={onSignOutClick}
-          title={collapsed ? "Sign Out" : undefined}
+          title={collapsed ? t("signOut") : undefined}
           className={`flex w-full items-center rounded-xl py-2.5 text-left text-[14px] font-medium text-[#F2A79B] transition duration-200 hover:bg-white/5 ${
             collapsed ? "justify-center px-0" : "gap-3 px-3"
           }`}
@@ -159,7 +161,7 @@ function SidebarContent({ active, onNavigate, onSignOutClick, extra, collapsed, 
           <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/10">
             <Icon name="logout" style={{ fontSize: 16 }} />
           </span>
-          {!collapsed && "Sign Out"}
+          {!collapsed && t("signOut")}
         </button>
       </div>
     </div>
@@ -169,6 +171,7 @@ function SidebarContent({ active, onNavigate, onSignOutClick, extra, collapsed, 
 const SIDEBAR_COLLAPSE_KEY = "sidebar_collapsed";
 
 export function SidebarNav({ active = "home", mobileOpen, onClose, onSignOutClick, extra, width = "w-64", extraNavItem, homeTo }) {
+  const { t } = useLanguage();
   // สถานะพับ/ขยายเก็บใน localStorage ให้จำไว้ข้ามหน้า/ข้ามการเปิดเว็บใหม่ — ใช้เฉพาะฝั่งเดสก์ท็อป
   const [collapsed, setCollapsed] = useState(() => {
     try {
@@ -204,8 +207,8 @@ export function SidebarNav({ active = "home", mobileOpen, onClose, onSignOutClic
           type="button"
           onClick={() => setCollapsed((c) => !c)}
           aria-expanded={!collapsed}
-          aria-label={collapsed ? "Expand menu" : "Collapse menu"}
-          title={collapsed ? "Expand menu" : "Collapse menu"}
+          aria-label={t(collapsed ? "expandMenu" : "collapseMenu")}
+          title={t(collapsed ? "expandMenu" : "collapseMenu")}
           className="toggle-collapse-btn absolute -right-2.5 top-1/2 z-20 flex h-[120px] w-7 -translate-y-1/2 items-center justify-end rounded-r-lg text-white/80 transition-colors hover:text-white focus-visible:text-white focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-4 focus-visible:outline-white"
         >
           <Icon
@@ -226,7 +229,7 @@ export function SidebarNav({ active = "home", mobileOpen, onClose, onSignOutClic
               type="button"
               onClick={onClose}
               className="absolute right-3 top-4 flex h-8 w-8 items-center justify-center rounded-lg text-white/70 hover:bg-white/10 hover:text-white"
-              aria-label="Close menu"
+              aria-label={t("closeMenu")}
             >
               <Icon name="x" style={{ fontSize: 16 }} />
             </button>

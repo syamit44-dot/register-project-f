@@ -9,8 +9,10 @@ import { isAuthenticated, clearAuth } from "../api/auth";
 import { IconSprite } from "../components/IconSprite";
 import { AppShellStyles, LoadingPanel, SidebarNav, SignOutModal } from "../components/AppShell";
 import { useLanguage } from "../i18n.jsx";
+import countryData from "../data/countryData";
 
 const PLATFORM_LABEL = { smartlink: "SmartLink", tempview: "TempView / FarmNet", silonic: "Silonic-Xi" };
+const COUNTRY_CODES = new Map(countryData.map(({ name, code }) => [name, code]));
 
 const FARM_ICONS = [
   { id: 0, name: "barn", label: "farmIconBarn" },
@@ -26,12 +28,12 @@ const CUSTOM_FARM_ICON_ID = 8;
 const FARM_ICON_TEXT_PATTERN = /^[A-Za-z0-9]{1,3}$/;
 
 const STATUS_TONE = {
-  approved: { tint: "#e4f6ee", solid: "#1f8a5c", label: "Approved" },
-  pushed: { tint: "#e4f6ee", solid: "#1f8a5c", label: "Approved" },
-  edited: { tint: "#e6f1fb", solid: "#185fa5", label: "Edited" },
-  pending: { tint: "#fbf2de", solid: "#b5820a", label: "Pending" },
-  rejected: { tint: "#fbeae8", solid: "#b23a2e", label: "Rejected" },
+  approved: { tint: "#e4f6ee", solid: "#1f8a5c", label: "statusApproved" },
+  edited: { tint: "#e6f1fb", solid: "#185fa5", label: "statusEdited" },
+  pending: { tint: "#fbf2de", solid: "#b5820a", label: "statusPending" },
+  rejected: { tint: "#fbeae8", solid: "#b23a2e", label: "statusRejected" },
 };
+const STATUS_FILTER_OPTIONS = ["all", "approved", "pending", "edited", "rejected"];
 
 // การ์ดสถิติของโหมด Dashboard — สรุปตัวเลขรวมทั้งระบบ 4 กล่อง
 function DashboardStatCard({ icon, label, value, accent, tint }) {
@@ -48,9 +50,10 @@ function DashboardStatCard({ icon, label, value, accent, tint }) {
 }
 
 // การ์ดฟาร์มของโหมด Dashboard — สรุปข้อมูลฟาร์มแบบกระชับแต่ครบ อ่านง่ายเป็นระบบเดียวกับการ์ดหลัก
-function DashboardFarmCard({ farm, onOpenFarm, onOpenIconPicker }) {
+function DashboardFarmCard({ farm, countryName, onOpenFarm, onOpenIconPicker }) {
   const { t } = useLanguage();
-  const tone = STATUS_TONE[farm.status] || STATUS_TONE.pending;
+  const status = farm.status === "pushed" ? "approved" : farm.status;
+  const tone = STATUS_TONE[status] || STATUS_TONE.pending;
   const icon = FARM_ICONS.find(({ id }) => id === farm.icon_id) ?? FARM_ICONS[0];
   const deviceCount = (farm.houses || []).reduce((s, h) => s + h.equipment.length, 0);
   const userCount = (farm.app_users || []).length;
@@ -79,13 +82,13 @@ function DashboardFarmCard({ farm, onOpenFarm, onOpenIconPicker }) {
           <div className="flex items-start justify-between gap-2">
             <h3 className="truncate text-[14.5px] font-bold leading-tight text-[#16233D]">{farm.farm_name}</h3>
             <span className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ background: tone.tint, color: tone.solid }}>
-              {tone.label}
+              {t(tone.label)}
             </span>
           </div>
           <div className="mt-1 flex items-center gap-1 text-[11.5px] text-slate-500">
             <Icon name="home" style={{ fontSize: 10 }} className="shrink-0 text-[#185FA5]" />
             <span className="truncate">
-              {farm.province}, {farm.country}
+              {[farm.province, countryName].filter(Boolean).join(", ")}
             </span>
           </div>
         </div>
@@ -100,15 +103,15 @@ function DashboardFarmCard({ farm, onOpenFarm, onOpenIconPicker }) {
       <div className="mt-3 grid grid-cols-3 gap-1 border-t border-slate-100 pt-3 text-center">
         <div>
           <div className="text-[15px] font-bold leading-none text-[#16233D]">{farm.house_count}</div>
-          <div className="mt-1 text-[10px] text-slate-500">Houses</div>
+          <div className="mt-1 text-[10px] text-slate-500">{t("homeHouses")}</div>
         </div>
         <div>
           <div className="text-[15px] font-bold leading-none text-[#16233D]">{deviceCount}</div>
-          <div className="mt-1 text-[10px] text-slate-500">Devices</div>
+          <div className="mt-1 text-[10px] text-slate-500">{t("homeDevices")}</div>
         </div>
         <div>
           <div className="text-[15px] font-bold leading-none text-[#16233D]">{userCount}</div>
-          <div className="mt-1 text-[10px] text-slate-500">Users</div>
+          <div className="mt-1 text-[10px] text-slate-500">{t("homeUsers")}</div>
         </div>
       </div>
 
@@ -221,7 +224,8 @@ export default function Home() {
   const navigate = useNavigate();
   const { state } = useLocation();
   const openRegistrationIfEmpty = state?.openRegistrationIfEmpty === true;
-  const { t } = useLanguage();
+  const { lang, t } = useLanguage();
+  const countryNames = useMemo(() => new Intl.DisplayNames([lang], { type: "region" }), [lang]);
   const [records, setRecords] = useState([]);
   const { farms, catalogError, retryCatalog } = useFarmSummaries(records);
   const [loading, setLoading] = useState(true);
@@ -296,15 +300,7 @@ export default function Home() {
   // ตัวเลือกกรองสถานะ — แปลงจาก native <select> เดิม (ทำให้หน้าตา dropdown ไปตามธีมของแต่ละ browser
   // ไม่ตรงกับดีไซน์ระบบ) มาเป็น dropdown ที่คุมหน้าตาเองแบบเดียวกับตัวเลือกภาษา
   const [statusMenuOpen, setStatusMenuOpen] = useState(false);
-  const STATUS_FILTER_OPTIONS = [
-    { key: "all", label: "All statuses" },
-    { key: "approved", label: "Approved" },
-    { key: "pending", label: "Pending" },
-    { key: "edited", label: "Edited" },
-    { key: "rejected", label: "Rejected" },
-  ];
-  const currentStatusOption =
-    STATUS_FILTER_OPTIONS.find((o) => o.key === statusFilter) ?? STATUS_FILTER_OPTIONS[0];
+  const statusLabel = (status) => t(STATUS_TONE[status]?.label ?? "homeAllStatuses");
 
   // เนื้อหาเสริมของแถบเมนูซ้าย — ค้นหา กรองสถานะ และลงทะเบียนฟาร์ม
   const sidebarExtra = !loading && farms.length > 0 && (
@@ -317,7 +313,8 @@ export default function Home() {
           type="text"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          placeholder="Search farms..."
+          placeholder={t("homeSearchFarms")}
+          aria-label={t("homeSearchFarms")}
           className="sidebar-input w-full rounded-lg border border-white/10 bg-white/5 py-2.5 pl-9 pr-3 text-[13px] text-white placeholder:text-white/40"
         />
       </div>
@@ -331,7 +328,7 @@ export default function Home() {
           aria-expanded={statusMenuOpen}
           className="sidebar-input flex w-full items-center justify-between gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2.5 text-left text-[13px] font-medium text-white"
         >
-          <span className="truncate">{currentStatusOption.label}</span>
+          <span className="truncate">{statusLabel(statusFilter)}</span>
           <span className={`shrink-0 text-[10px] transition-transform duration-200 ${statusMenuOpen ? "rotate-180" : ""}`}>
             ▾
           </span>
@@ -340,20 +337,20 @@ export default function Home() {
           <>
             <div className="fixed inset-0 z-10" onClick={() => setStatusMenuOpen(false)} />
             <div className="absolute left-0 top-full z-20 mt-1 w-full overflow-hidden rounded-xl border border-white/10 bg-[#0A3A69] p-1.5 shadow-[0_16px_32px_rgba(0,0,0,0.35)]">
-              {STATUS_FILTER_OPTIONS.map((o) => (
+              {STATUS_FILTER_OPTIONS.map((status) => (
                 <button
-                  key={o.key}
+                  key={status}
                   type="button"
                   onClick={() => {
-                    setStatusFilter(o.key);
+                    setStatusFilter(status);
                     setStatusMenuOpen(false);
                   }}
                   className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold transition-all duration-150 ${
-                    statusFilter === o.key ? "bg-[#185FA5] text-white" : "text-white/70 hover:bg-white/10 hover:text-white"
+                    statusFilter === status ? "bg-[#185FA5] text-white" : "text-white/70 hover:bg-white/10 hover:text-white"
                   }`}
                 >
-                  <span className="flex-1 truncate">{o.label}</span>
-                  {statusFilter === o.key && <span className="text-sm">✓</span>}
+                  <span className="flex-1 truncate">{statusLabel(status)}</span>
+                  {statusFilter === status && <span className="text-sm">✓</span>}
                 </button>
               ))}
             </div>
@@ -367,7 +364,7 @@ export default function Home() {
         className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-white px-4 py-2.5 text-[13px] font-semibold text-[#0C447C] transition duration-150 hover:bg-slate-100"
       >
         <Icon name="plus" style={{ fontSize: 13 }} />
-        Register Farm
+        {t("newRegister")}
       </button>
     </div>
   );
@@ -412,7 +409,7 @@ export default function Home() {
             type="button"
             onClick={() => setSidebarOpen(true)}
             className="fixed left-4 top-4 z-30 flex h-10 w-10 items-center justify-center rounded-full bg-white text-slate-600 shadow-[0_6px_18px_rgba(15,23,42,0.18)] md:hidden"
-            aria-label="Open menu"
+            aria-label={t("openMenu")}
           >
             <Icon name="menu" style={{ fontSize: 18 }} />
           </button>
@@ -427,46 +424,55 @@ export default function Home() {
               </p>
             ) : farms.length === 0 ? (
               <div className="rounded-lg border border-dashed border-slate-300 bg-white p-10 text-center">
-                <p className="text-sm font-medium text-slate-600">No farms registered yet</p>
-                <p className="mt-1 text-[12.5px] text-slate-500">Get started by adding your first farm's information</p>
+                <p className="text-sm font-medium text-slate-600">{t("homeNoFarms")}</p>
+                <p className="mt-1 text-[12.5px] text-slate-500">{t("homeNoFarmsHint")}</p>
                 <button
                   type="button"
                   onClick={() => navigate("/customer")}
                   className="mt-4 rounded-lg bg-[#185FA5] px-5 py-2.5 text-[13px] font-semibold text-white hover:bg-[#0C447C]"
                 >
-                  Register New Farm
+                  {t("newRegister")}
                 </button>
               </div>
             ) : count === 0 ? (
               <div className="rounded-lg border border-dashed border-slate-300 bg-white p-10 text-center">
-                <p className="text-sm font-medium text-slate-600">No farms match your search</p>
-                <p className="mt-1 text-[12.5px] text-slate-500">Try a different keyword or status filter</p>
+                <p className="text-sm font-medium text-slate-600">{t("homeNoMatches")}</p>
+                <p className="mt-1 text-[12.5px] text-slate-500">{t("homeNoMatchesHint")}</p>
               </div>
             ) : (
               <div className="dashboard-enter flex min-h-0 flex-1 flex-col">
                 {/* Overview — สรุปตัวเลขรวม อยู่นิ่งด้านบนเสมอ */}
                 <div className="mb-5 shrink-0">
-                  <h2 className="mb-3 text-[12px] font-bold uppercase tracking-[0.08em] text-slate-500">Overview</h2>
+                  <h2 className="mb-3 text-[12px] font-bold uppercase tracking-[0.08em] text-slate-500">{t("homeOverview")}</h2>
                   <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-4">
-                    <DashboardStatCard icon="building-warehouse" label="Total Farms" value={farms.length} accent="#185FA5" tint="#E6F1FB" />
-                    <DashboardStatCard icon="barn" label="Total Houses" value={totalHouses} accent="#0f8a7e" tint="#e6f7f5" />
-                    <DashboardStatCard icon="router" label="Total Devices" value={totalDevices} accent="#7c5cd6" tint="#f1eefb" />
-                    <DashboardStatCard icon="shield-check" label="Total Users" value={totalUsers} accent="#b5820a" tint="#fbf2de" />
+                    <DashboardStatCard icon="building-warehouse" label={t("homeTotalFarms")} value={farms.length} accent="#185FA5" tint="#E6F1FB" />
+                    <DashboardStatCard icon="barn" label={t("homeTotalHouses")} value={totalHouses} accent="#0f8a7e" tint="#e6f7f5" />
+                    <DashboardStatCard icon="router" label={t("homeTotalDevices")} value={totalDevices} accent="#7c5cd6" tint="#f1eefb" />
+                    <DashboardStatCard icon="shield-check" label={t("homeTotalUsers")} value={totalUsers} accent="#b5820a" tint="#fbf2de" />
                   </div>
                 </div>
 
                 {/* หัวข้อรายการฟาร์ม — อยู่นิ่งเช่นกัน มีแค่โซนการ์ดด้านล่างที่เลื่อนได้ */}
                 <div className="mb-3 flex shrink-0 items-center justify-between">
-                  <h2 className="text-[12px] font-bold uppercase tracking-[0.08em] text-slate-500">Farms</h2>
-                  <span className="text-[12px] text-slate-500">{count} total</span>
+                  <h2 className="text-[12px] font-bold uppercase tracking-[0.08em] text-slate-500">{t("homeFarms")}</h2>
+                  <span className="text-[12px] text-slate-500">{t("homeFarmCount", { count })}</span>
                 </div>
 
                 {/* โซนการ์ดฟาร์ม — เลื่อนได้เฉพาะส่วนนี้ ไม่กระทบส่วนอื่นของหน้า และไม่กระทบขนาดการ์ด */}
                 <div className="dash-scroll min-h-0 flex-1 overflow-y-auto pb-1 pr-1">
                   <div className="grid grid-cols-1 gap-4 pb-4 sm:grid-cols-2">
-                    {filteredFarms.map((farm) => (
-                      <DashboardFarmCard key={farm.id} farm={farm} onOpenFarm={handleOpenFarm} onOpenIconPicker={setIconFarm} />
-                    ))}
+                    {filteredFarms.map((farm) => {
+                      const code = COUNTRY_CODES.get(farm.country);
+                      return (
+                        <DashboardFarmCard
+                          key={farm.id}
+                          farm={farm}
+                          countryName={code ? countryNames.of(code) : farm.country}
+                          onOpenFarm={handleOpenFarm}
+                          onOpenIconPicker={setIconFarm}
+                        />
+                      );
+                    })}
                   </div>
                 </div>
               </div>
