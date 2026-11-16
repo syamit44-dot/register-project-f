@@ -274,7 +274,10 @@ export default function CustomerForm({ initialValues = initialData, isDealer = g
   const [editConflict, setEditConflict] = useState(
     () => editing && Boolean(restoredDraft) && restoredDraft.data.date_edit !== initialValues.date_edit,
   );
-  const [error, setError] = useState("");
+  const [submitError, setSubmitError] = useState(null);
+  const submitErrorMessage = submitError?.translationKey
+    ? t(submitError.translationKey)
+    : submitError ? registrationErrorMessage(submitError.cause, t) : "";
   const [done, setDone] = useState(false);
   const [secondsRemaining, setSecondsRemaining] = useState(RETURN_HOME_SECONDS);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -349,7 +352,7 @@ export default function CustomerForm({ initialValues = initialData, isDealer = g
 
   async function handleSubmit() {
     if (editConflict) return;
-    setError("");
+    setSubmitError(null);
     if (validation.error) {
       setShowValidation(true);
       setCurrent(validation.error.step);
@@ -357,7 +360,7 @@ export default function CustomerForm({ initialValues = initialData, isDealer = g
       return;
     }
     if (!editing && !data.pdpa_consent) {
-      setError(t("pdpaConsentRequired"));
+      setSubmitError({ translationKey: "pdpaConsentRequired" });
       return;
     }
 
@@ -379,7 +382,7 @@ export default function CustomerForm({ initialValues = initialData, isDealer = g
       if (editing && err.response?.status === 409 && err.response.data?.code === "farm_edit_conflict") {
         setEditConflict(true);
       } else {
-        setError(registrationErrorMessage(err, t));
+        setSubmitError({ cause: err });
       }
     } finally {
       setSubmitting(false);
@@ -490,7 +493,7 @@ export default function CustomerForm({ initialValues = initialData, isDealer = g
                       nextLabel={submitting ? t("submitting") : t(editing ? "save" : "submit")}
                       nextIcon="check"
                       nextDisabled={submitting || editConflict || (editing && !hasDraft)}
-                      error={error}
+                      error={submitErrorMessage}
                     />
                   </div>
                 </div>
