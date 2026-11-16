@@ -254,7 +254,7 @@ export default function Step4Confirm({ data, onChange, onGoTo }) {
                       <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-brand text-xs text-white" aria-hidden="true">
                         {i + 1}
                       </span>
-                      <span className="min-w-0">{house.name}</span>
+                      <span className="min-w-0">{t("numberedHouse", { number: i + 1 })}</span>
                     </h4>
                     {equipment.length ? (
                       <ul className="mt-1.5 divide-y divide-line">
@@ -287,7 +287,7 @@ export default function Step4Confirm({ data, onChange, onGoTo }) {
                           );
                         })}
                       </ul>
-                    ) : <p className="mt-1.5 text-sm text-alert">{t("registrationHouseNeedsEquipment", { house: house.name })}</p>}
+                    ) : <p className="mt-1.5 text-sm text-alert">{t("registrationHouseNeedsEquipment", { house: t("numberedHouse", { number: i + 1 }) })}</p>}
                   </li>
                 );
               })}

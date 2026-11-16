@@ -109,7 +109,7 @@ export default function RegistrationDetailView({ data }) {
         <div className="space-y-2">
           {(data.houses || []).map((house) => (
             <div key={house.id} className="rounded-control border border-line bg-mist px-4 py-3 text-base">
-              <h4 className="font-semibold text-ink">{house.name}</h4>
+              <h4 className="font-semibold text-ink">{t("numberedHouse", { number: house.id })}</h4>
               <ul className="mt-2 divide-y divide-line">
                 {house.equipment.map((item) => (
                   <li key={item.id} className="grid grid-cols-2 gap-x-4 gap-y-1 py-2 text-sm sm:grid-cols-4">

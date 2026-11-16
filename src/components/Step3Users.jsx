@@ -2,13 +2,14 @@ import { useMemo, useState } from "react";
 import Icon from "./Icon";
 import SearchableSelect from "./SearchableSelect";
 import { compareAppUserRole, getSelectedAppModels } from "../utils/registrationModels";
-import { APP_USERNAME_MAX_LENGTH, MAIN_APP_USERS_PER_MODEL, appUserCounts, isValidAppUsername, sanitizeAppUsername } from "../utils/registrationPayload";
+import { APP_USERNAME_MAX_LENGTH, MAIN_APP_USERS_PER_MODEL, appUserCounts, duplicateAppUsernames, isValidAppUsername, sanitizeAppUsername } from "../utils/registrationPayload";
 import { useLanguage } from "../i18n.jsx";
 
 const UNASSIGNED = "__unassigned__";
 
 export default function Step3Users({ data, onChange, isDealer, allowModelChange = false }) {
   const { t } = useLanguage();
+  const duplicateUsernames = duplicateAppUsernames(data.app_users);
   const [showUserInfo, setShowUserInfo] = useState(false);
   // เก็บสถานะ ย่อ/ขยาย ของแต่ละกลุ่มด้วย key ของกลุ่ม — ค่าเริ่มต้นคือ "ขยาย" ทุกกลุ่ม
   // (ไม่ต้องระบุใน state ก็ถือว่าขยายอยู่ ยกเว้นจะถูกเพิ่มลง collapsedGroups)
@@ -203,6 +204,9 @@ export default function Step3Users({ data, onChange, isDealer, allowModelChange 
                       <div className="space-y-2">
                         {group.users.map((u) => {
                           const invalidUsername = Boolean(u.username) && u.username !== u.original_username && !isValidAppUsername(u.username);
+                          const usernameError = invalidUsername
+                            ? t("appUsernameFormatWarning")
+                            : duplicateUsernames.has(u.username?.trim()) ? t("appUsernameDuplicate", { username: u.username.trim() }) : "";
                           const canSelectSuper = u.is_dealer || u.user_type === "super" || counts.superusers === 0;
                           const usernameErrorId = `app-username-error-${u.index}`;
                           return (
@@ -232,14 +236,14 @@ export default function Step3Users({ data, onChange, isDealer, allowModelChange 
                                 </label>
                                 <input
                                   className={`mono h-10 w-full rounded-xl border bg-white px-3 text-sm text-ink shadow-sm outline-none transition focus:ring-4 ${
-                                    invalidUsername
+                                    usernameError
                                       ? "!border-alert focus:ring-alert-tint"
                                       : "border-line-strong hover:border-brand/50 focus:border-brand focus:ring-brand-tint"
                                   }`}
                                   placeholder="name@farm"
                                   aria-label={t("Username")}
-                                  aria-invalid={invalidUsername}
-                                  aria-describedby={invalidUsername ? usernameErrorId : undefined}
+                                  aria-invalid={Boolean(usernameError)}
+                                  aria-describedby={usernameError ? usernameErrorId : undefined}
                                   pattern="[a-z0-9]+@[a-z0-9]+"
                                   maxLength={APP_USERNAME_MAX_LENGTH}
                                   autoCapitalize="none"
@@ -247,9 +251,9 @@ export default function Step3Users({ data, onChange, isDealer, allowModelChange 
                                   value={u.username}
                                   onChange={(e) => setUserField(u.index, "username", sanitizeAppUsername(e.target.value))}
                                 />
-                                {invalidUsername && (
+                                {usernameError && (
                                   <p id={usernameErrorId} className="mt-1 text-[12px] text-alert">
-                                    {t("appUsernameFormatWarning")}
+                                    {usernameError}
                                   </p>
                                 )}
                               </div>
@@ -270,7 +274,7 @@ export default function Step3Users({ data, onChange, isDealer, allowModelChange 
                               />
                               <div>
                                 <label className="mb-1 block text-[12px] font-semibold text-ink-soft">
-                                  {t("Email")}
+                                  Email
                                 </label>
                                 <input
                                   type="email"
@@ -280,12 +284,10 @@ export default function Step3Users({ data, onChange, isDealer, allowModelChange 
                                   onChange={(e) => setUserField(u.index, "email", e.target.value)}
                                 />
                               </div>
-                              <div className="flex flex-col justify-start">
-                                <label className="mb-1 block text-[12px] uppercase text-transparent select-none">
-                                  {t("delete")}
-                                </label>
+                              <div className="flex flex-col justify-start pt-[22px]">
                                 <button
                                   type="button"
+                                  aria-label={t("removeAppUser")}
                                   className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-line-strong bg-white text-alert transition hover:border-alert hover:bg-alert-tint"
                                   onClick={() => removeUser(u.index)}
                                 >

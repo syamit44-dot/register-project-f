@@ -28,6 +28,18 @@ export function sanitizeAppUsername(value) {
 
 export const MAIN_APP_USERS_PER_MODEL = 5;
 
+export function duplicateAppUsernames(users) {
+  const seen = new Set();
+  const duplicates = new Set();
+  for (const { username } of users) {
+    const name = username?.trim();
+    if (!name) continue;
+    if (seen.has(name)) duplicates.add(name);
+    seen.add(name);
+  }
+  return duplicates;
+}
+
 export function appUserCounts(users) {
   const main = users.filter((user) => !user.is_dealer);
   return {
@@ -46,11 +58,12 @@ export function registrationPayload(data, t, isDealer = false, original = null) 
 
   const houseCount = Number(data.house_count);
   if (data.houses.length < houseCount) {
-    throw new RegistrationInputError(t("registrationHouseNeedsEquipment", { house: `House ${data.houses.length + 1}` }), 1);
+    const house = t("numberedHouse", { number: data.houses.length + 1 });
+    throw new RegistrationInputError(t("registrationHouseNeedsEquipment", { house }), 1);
   }
   data.houses.slice(0, houseCount).forEach((house, index) => {
     const enabled = equipmentFields.filter((field) => house[field.enabled]);
-    const houseName = house.name || `House ${index + 1}`;
+    const houseName = t("numberedHouse", { number: index + 1 });
     if (enabled.length === 0) {
       throw new RegistrationInputError(t("registrationHouseNeedsEquipment", { house: houseName }), 1);
     }
@@ -85,6 +98,10 @@ export function registrationPayload(data, t, isDealer = false, original = null) 
 
   const farmName = data.farm_name.trim();
   const appUsers = data.app_users.filter((user) => user.device_model || user.email || user.username !== "default1234");
+  const [duplicateUsername] = duplicateAppUsernames(appUsers);
+  if (duplicateUsername) {
+    throw new RegistrationInputError(t("appUsernameDuplicate", { username: duplicateUsername }), 2);
+  }
   const usersByModel = new Map();
   for (const user of appUsers) {
     const model = String(user.device_model ?? "");
@@ -160,6 +177,10 @@ export function registrationErrorMessage(error, t) {
   if (error instanceof RegistrationInputError) return error.message;
   const response = error.response?.data;
   if (response && typeof response === "object") {
+    if (response.code === "app_username_duplicate" || response.code === "app_username_taken") {
+      const key = response.code === "app_username_duplicate" ? "appUsernameDuplicate" : "appUsernameTaken";
+      return t(key, { username: response.username });
+    }
     const detail = response.detail ?? response.error ?? response.message;
     if (typeof detail === "string") return detail;
     if (detail && typeof detail === "object") {

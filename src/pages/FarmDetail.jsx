@@ -49,7 +49,7 @@ function Field({ label, value, span, wrap = false }) {
   );
 }
 
-function HouseRow({ house }) {
+function HouseRow({ house, title }) {
   return (
     <div className="rounded-xl border border-line bg-mist/60 px-4 py-3.5 transition duration-200 hover:border-[#b9d3ea] hover:bg-white">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -57,7 +57,7 @@ function HouseRow({ house }) {
           <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#185FA5]/10 text-[#185FA5]">
             <Icon name="barn" style={{ fontSize: 15 }} />
           </span>
-          <span className="text-[13.5px] font-semibold text-ink">{house.name}</span>
+          <span className="text-[13.5px] font-semibold text-ink">{title}</span>
         </div>
         {house.serial_number && (
           <span className="rounded-full bg-white px-2.5 py-1 font-mono text-[11px] text-ink-soft shadow-[0_1px_2px_rgba(15,23,42,0.06)]">
@@ -304,8 +304,8 @@ export default function FarmDetail() {
                       {t("houseDetailsTitle")}
                     </div>
                     <div className="space-y-2">
-                      {houses.map((house) => (
-                        <HouseRow key={house.id || house.serial_number || house.name} house={house} />
+                      {houses.map((house, index) => (
+                        <HouseRow key={house.id || house.serial_number || house.name} house={house} title={t("numberedHouse", { number: house.id ?? index + 1 })} />
                       ))}
                       {houses.length === 0 && <p className="text-[13px] text-ink-soft">{t("noHouseData")}</p>}
                     </div>
@@ -352,4 +352,4 @@ export default function FarmDetail() {
       </div>
     </>
   );
-}   
+}

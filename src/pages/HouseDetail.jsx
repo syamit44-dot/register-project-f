@@ -61,7 +61,7 @@ export default function HouseDetail() {
           <>
             <div className="mb-6">
               <p className="text-[12.5px] text-ink-soft">{farmName}</p>
-              <h2 className="font-['Space_Grotesk'] text-[22px] font-semibold">{house.name}</h2>
+              <h2 className="font-['Space_Grotesk'] text-[22px] font-semibold">{t("numberedHouse", { number: Number(index) + 1 })}</h2>
               <p className="text-sm text-ink-soft">{house.serial_number}</p>
             </div>
 

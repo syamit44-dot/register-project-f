@@ -593,7 +593,7 @@ export default function Step2DeviceInfo({ active, data, onChange, editor, onEdit
                       {i + 1}
                     </div>
                     <div className="min-w-0">
-                      <div className="truncate text-[14px] font-bold text-ink">{h.name}</div>
+                      <div className="truncate text-[14px] font-bold text-ink">{t("numberedHouse", { number: i + 1 })}</div>
                       <div className="text-[11px] text-ink-soft">{t("house")}</div>
                     </div>
                   </div>
@@ -645,7 +645,7 @@ export default function Step2DeviceInfo({ active, data, onChange, editor, onEdit
             <div role="dialog" aria-modal="true" aria-labelledby="house-settings-title" className="flex max-h-[92vh] w-full max-w-5xl flex-col rounded-xl bg-white shadow-2xl">
               <div className="flex flex-shrink-0 items-center justify-between rounded-t-xl border-b border-line-strong bg-brand px-7 py-5">
                 <h2 id="house-settings-title" className="text-xl font-bold text-white sm:text-2xl">
-                  {isBulkEditing ? t("copyHouseSettings") : houses[editingIndex]?.name}
+                  {isBulkEditing ? t("copyHouseSettings") : t("numberedHouse", { number: editingIndex + 1 })}
                 </h2>
                 <button type="button" onClick={closeEditor} aria-label={t("close")} className="flex h-8 w-8 items-center justify-center rounded-full text-white/90 transition hover:bg-white/15 hover:text-white">
                   <Icon name="x" style={{ fontSize: 20 }} />
@@ -658,7 +658,7 @@ export default function Step2DeviceInfo({ active, data, onChange, editor, onEdit
                   <fieldset className="rounded-xl border border-line bg-white px-5 pb-4 pt-2">
                     <legend className="px-1 text-sm font-semibold text-ink">{t("copyHouseTargets")}</legend>
                     <div className="grid max-h-40 gap-2 overflow-y-auto sm:grid-cols-2 lg:grid-cols-4">
-                      {houses.map((house, index) => (
+                      {houses.map((_, index) => (
                         <label key={index} className="flex cursor-pointer items-center gap-2 rounded-lg border border-line px-3 py-2 text-sm hover:bg-mist">
                           <input
                             type="checkbox"
@@ -675,7 +675,7 @@ export default function Step2DeviceInfo({ active, data, onChange, editor, onEdit
                               }));
                             }}
                           />
-                          {house.name}
+                          {t("numberedHouse", { number: index + 1 })}
                         </label>
                       ))}
                     </div>

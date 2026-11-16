@@ -12,7 +12,7 @@ export default function StepRail({ current, completedSteps, onGoTo }) {
   ];
 
   return (
-    <nav className="editorial-steps" aria-label="Registration steps">
+    <nav className="editorial-steps" aria-label={t("registrationSteps")}>
       <div className="editorial-steps-list">
         {steps.map((step, i) => {
           const isActive = i === current;
