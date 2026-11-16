@@ -131,12 +131,9 @@ export default function SearchableSelect({ label, required, value, options, onCh
                   onPointerLeave={option.description ? () => setHoveredOption(null) : undefined}
                   onMouseDown={(event) => event.preventDefault()}
                   onClick={() => choose(option)}
-                  className={`flex cursor-pointer items-center justify-between gap-2 px-3 py-2 text-sm text-ink hover:bg-brand-tint ${index === highlight ? "bg-brand-tint" : ""}`}
+                  className={`cursor-pointer px-3 py-2 text-sm text-ink hover:bg-brand-tint ${index === highlight ? "bg-brand-tint" : ""}`}
                 >
                   {option.label}
-                  {option.description && (
-                    <span aria-hidden="true" className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-line-strong bg-white text-xs font-bold text-brand-dark">!</span>
-                  )}
                 </li>
               ))}
               {matches.length === 0 && <li className="px-3 py-2 text-sm text-ink-soft">{t("dropdownNoResults")}</li>}
