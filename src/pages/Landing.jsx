@@ -75,11 +75,25 @@ export default function Landing() {
   // signupStep: "verify" (ยืนยันตัวตน + รหัสเชิญ) -> "account" (ข้อมูลบัญชี)
   const [signupStep, setSignupStep] = useState("verify");
   const [authLoading, setAuthLoading] = useState(false);
+  const [loginRetryAt, setLoginRetryAt] = useState(0);
+  const [loginRetrySeconds, setLoginRetrySeconds] = useState(0);
   const [captchaVerified, setCaptchaVerified] = useState(false);
   const captchaRef = useRef(null);
   // อ้างอิงจาก lang โดยตรงแทนการเก็บ state ภาษาซ้ำซ้อน (เดิม initialize ผิดตอนโหลดค่า "zh" จาก localStorage)
   const selectedLanguage = languageOptions.find((option) => option.lang === lang) ?? languageOptions[1];
   const [activeSlide, setActiveSlide] = useState(0);
+
+  useEffect(() => {
+    if (!loginRetryAt) return;
+    function updateRetryTime() {
+      const seconds = Math.max(0, Math.ceil((loginRetryAt - Date.now()) / 1000));
+      setLoginRetrySeconds(seconds);
+      if (!seconds) setLoginRetryAt(0);
+    }
+    updateRetryTime();
+    const timer = window.setInterval(updateRetryTime, 1000);
+    return () => window.clearInterval(timer);
+  }, [loginRetryAt]);
 
   useEffect(() => {
     const id = setInterval(() => {
@@ -212,6 +226,7 @@ export default function Landing() {
 
   const handleAuth = async (event) => {
     event?.preventDefault();
+    if (authLoading || (authMode === "Sign In" && loginRetryAt > Date.now())) return;
     setError("");
     setFieldErrors({});
     const isSignup = authMode === "Sign Up";
@@ -292,7 +307,14 @@ export default function Landing() {
         }
       } catch (err) {
         captchaRef.current?.reset();
-        setError(err?.response?.data?.message || err?.response?.data?.error || t("signinFailed"));
+        if (err?.response?.status === 429) {
+          const retryAfter = Number(err.response.headers?.["retry-after"]);
+          const seconds = Number.isFinite(retryAfter) && retryAfter > 0 ? Math.ceil(retryAfter) : 60;
+          setLoginRetrySeconds(seconds);
+          setLoginRetryAt(Date.now() + seconds * 1000);
+        } else {
+          setError(err?.response?.data?.message || err?.response?.data?.error || t("signinFailed"));
+        }
       } finally {
         setAuthLoading(false);
       }
@@ -1296,10 +1318,15 @@ export default function Landing() {
                         {error && (
                           <p className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-center text-sm font-medium text-red-600">{error}</p>
                         )}
+                        {authMode === "Sign In" && loginRetrySeconds > 0 && (
+                          <p role="status" className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-center text-sm font-medium text-red-600">
+                            {t("signinRateLimited", { seconds: loginRetrySeconds })}
+                          </p>
+                        )}
                         <button
                           type="submit"
                           className="auth-primary-button mt-1 flex w-full items-center justify-center gap-2 rounded-xl bg-[#185FA5] py-3.5 text-[16px] font-semibold text-white shadow-[0_10px_24px_rgba(24,95,165,0.18)] transition duration-200 hover:-translate-y-0.5 hover:bg-[#0C447C] hover:shadow-[0_14px_28px_rgba(24,95,165,0.22)] disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0"
-                          disabled={authLoading || !captchaVerified}
+                          disabled={authLoading || !captchaVerified || (authMode === "Sign In" && loginRetrySeconds > 0)}
                         >
                           {authLoading && (
                             <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
