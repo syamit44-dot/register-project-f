@@ -77,6 +77,7 @@ export default function Landing() {
   const [authLoading, setAuthLoading] = useState(false);
   const [loginRetryAt, setLoginRetryAt] = useState(0);
   const [loginRetrySeconds, setLoginRetrySeconds] = useState(0);
+  const [loginConnectionError, setLoginConnectionError] = useState(false);
   const [captchaVerified, setCaptchaVerified] = useState(false);
   const captchaRef = useRef(null);
   // อ้างอิงจาก lang โดยตรงแทนการเก็บ state ภาษาซ้ำซ้อน (เดิม initialize ผิดตอนโหลดค่า "zh" จาก localStorage)
@@ -227,6 +228,7 @@ export default function Landing() {
   const handleAuth = async (event) => {
     event?.preventDefault();
     if (authLoading || (authMode === "Sign In" && loginRetryAt > Date.now())) return;
+    setLoginConnectionError(false);
     setError("");
     setFieldErrors({});
     const isSignup = authMode === "Sign Up";
@@ -312,6 +314,8 @@ export default function Landing() {
           const seconds = Number.isFinite(retryAfter) && retryAfter > 0 ? Math.ceil(retryAfter) : 60;
           setLoginRetrySeconds(seconds);
           setLoginRetryAt(Date.now() + seconds * 1000);
+        } else if (!err?.response && err?.isAxiosError) {
+          setLoginConnectionError(true);
         } else {
           setError(err?.response?.data?.message || err?.response?.data?.error || t("signinFailed"));
         }
@@ -358,6 +362,7 @@ export default function Landing() {
   };
 
   const handleClearData = () => {
+    setLoginConnectionError(false);
     setAccountType("");
     setPassword("");
     setUsername("");
@@ -1322,6 +1327,14 @@ export default function Landing() {
                           <p role="status" className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-center text-sm font-medium text-red-600">
                             {t("signinRateLimited", { seconds: loginRetrySeconds })}
                           </p>
+                        )}
+                        {authMode === "Sign In" && loginConnectionError && (
+                          <p role="alert" className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-center text-sm font-medium text-red-600">
+                            {t("signinConnectionError")}
+                          </p>
+                        )}
+                        {authMode === "Sign In" && loginRetrySeconds === 0 && (
+                          <p className="mb-3 text-center text-xs text-slate-500">{t("signinRateLimitHint")}</p>
                         )}
                         <button
                           type="submit"
