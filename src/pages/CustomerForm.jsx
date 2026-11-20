@@ -302,8 +302,15 @@ export default function CustomerForm({ initialValues = initialData, isDealer = g
       allowLeave.current = true;
       storeDraft(draftKey, null);
     }
+    function allowExpiredSessionExit() {
+      allowLeave.current = true;
+    }
     window.addEventListener("auth:changed", discardOnAccountChange);
-    return () => window.removeEventListener("auth:changed", discardOnAccountChange);
+    window.addEventListener("auth:expired", allowExpiredSessionExit);
+    return () => {
+      window.removeEventListener("auth:changed", discardOnAccountChange);
+      window.removeEventListener("auth:expired", allowExpiredSessionExit);
+    };
   }, [draftKey]);
 
   useEffect(() => {

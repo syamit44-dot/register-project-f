@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { checkAuthSession } from "./api/auth";
+import { checkAuthSession, hasExpiredSession } from "./api/auth";
 import { useLanguage } from "./i18n.jsx";
-import { createHashRouter, Navigate, Outlet, RouterProvider } from "react-router-dom";
+import { createHashRouter, Navigate, Outlet, RouterProvider, useNavigate } from "react-router-dom";
 import IconSprite from "./components/IconSprite";
 import Landing from "./pages/Landing";
 import CustomerForm, { FarmEditPage } from "./pages/CustomerForm";
@@ -11,32 +11,47 @@ import AccountPage from "./pages/AccountPage";
 
 function AccountChangedDialog() {
   const { t } = useLanguage();
+  const navigate = useNavigate();
   const [changed, setChanged] = useState(false);
+  const [expired, setExpired] = useState(hasExpiredSession);
   const dialogRef = useRef(null);
 
   useEffect(() => {
     const onChange = () => setChanged(true);
+    const onExpired = () => setExpired(true);
     window.addEventListener("auth:changed", onChange);
+    window.addEventListener("auth:expired", onExpired);
+    if (hasExpiredSession()) onExpired();
     if (!checkAuthSession()) onChange();
-    return () => window.removeEventListener("auth:changed", onChange);
+    return () => {
+      window.removeEventListener("auth:changed", onChange);
+      window.removeEventListener("auth:expired", onExpired);
+    };
   }, []);
 
   useEffect(() => {
-    if (!changed) return;
+    if (!changed && !expired) return;
     const dialog = dialogRef.current;
     dialog.showModal();
     return () => dialog.close();
-  }, [changed]);
+  }, [changed, expired]);
 
-  if (!changed) return null;
+  if (!changed && !expired) return null;
   return (
     <dialog ref={dialogRef} aria-labelledby="account-changed-title" onCancel={(event) => event.preventDefault()}
       className="m-auto w-[calc(100%-2rem)] max-w-md rounded-xl border border-line bg-white p-6 text-ink shadow-xl backdrop:bg-ink/45">
-      <h2 id="account-changed-title" className="text-lg font-bold">{t("accountChangedTitle")}</h2>
-      <p className="mt-2 text-sm text-ink-soft">{t("accountChangedMessage")}</p>
+      <h2 id="account-changed-title" className="text-lg font-bold">{t(changed ? "accountChangedTitle" : "sessionExpiredTitle")}</h2>
+      <p className="mt-2 text-sm text-ink-soft">{t(changed ? "accountChangedMessage" : "sessionExpiredMessage")}</p>
       <button type="button" className="mt-5 rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white"
-        onClick={() => window.location.reload()}>
-        {t("accountChangedReload")}
+        onClick={() => {
+          if (changed) {
+            window.location.reload();
+          } else {
+            setExpired(false);
+            navigate("/", { replace: true });
+          }
+        }}>
+        {t(changed ? "accountChangedReload" : "signIn")}
       </button>
     </dialog>
   );

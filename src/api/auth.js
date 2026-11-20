@@ -27,6 +27,7 @@ function accountKey(auth) {
 
 let tabAccount = accountKey(readStoredAuth());
 let accountChanged = false;
+let sessionExpired = false;
 
 function markAccountChanged() {
   if (accountChanged) return;
@@ -54,6 +55,7 @@ export function saveAuth({ username, email, token, first_name, last_name, accoun
   if (!checkAuthSession()) throw new Error("The account changed in another tab.");
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   tabAccount = accountKey(data);
+  sessionExpired = false;
   return data;
 }
 
@@ -104,6 +106,16 @@ export function clearAuth() {
   if (!checkAuthSession()) return;
   localStorage.removeItem(STORAGE_KEY);
   tabAccount = null;
+}
+
+export function expireAuth() {
+  clearAuth();
+  sessionExpired = true;
+  window.dispatchEvent(new Event("auth:expired"));
+}
+
+export function hasExpiredSession() {
+  return sessionExpired;
 }
 
 export function isAuthenticated() {

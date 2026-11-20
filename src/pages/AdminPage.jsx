@@ -5,7 +5,7 @@ import RegistrationModal from "../components/RegistrationModal";
 import FarmCatalogNotice from "../components/FarmCatalogNotice";
 import { useFarmSummaries } from "../hooks/useFarmSummaries";
 import { SignOutModal } from "../components/AppShell";
-import { changeRegistrationStatus, deleteRegistration, listRegistrations, signOut } from "../api/client";
+import { changeRegistrationStatus, deleteRegistration, getRegistration, listRegistrations, signOut } from "../api/client";
 import { useLanguage } from "../i18n.jsx";
 
 const PLATFORM_LABEL = { smartlink: "SmartLink", tempview: "TempView / FarmNet" };
@@ -219,7 +219,7 @@ export default function AdminPage() {
       const matchesSearch = !q || `${r.farm_name} ${r.farm_short}`.toLowerCase().includes(q);
       const s = r.status === "pushed" ? "approved" : r.status;
       const matchesStatus = selectedStatuses.length === 0 || selectedStatuses.includes(s);
-      const matchesPlatform = selectedPlatforms.length === 0 || selectedPlatforms.includes(r.platform);
+      const matchesPlatform = selectedPlatforms.length === 0 || selectedPlatforms.some((platform) => r.platforms.includes(platform));
       return matchesSearch && matchesStatus && matchesPlatform;
     });
   }, [rows, search, selectedStatuses, selectedPlatforms]);
@@ -255,13 +255,24 @@ export default function AdminPage() {
     setPendingAction(true);
     setActionError("");
     try {
-      const { status } = await changeRegistrationStatus(id, action);
+      const record = records.find((record) => record.farm.id === id);
+      const { status, date_edit } = await changeRegistrationStatus(id, action, record.farm.date_edit);
       setRecords((prev) => prev.map((record) => (
-        record.farm.id === id ? { ...record, farm: { ...record.farm, status } } : record
+        record.farm.id === id ? { ...record, farm: { ...record.farm, status, date_edit } } : record
       )));
       setDetailId(null);
-    } catch {
-      setActionError(t("farmAdminActionError"));
+    } catch (error) {
+      if (error.response?.status === 409 && error.response.data?.code === "farm_edit_conflict") {
+        try {
+          const latest = await getRegistration(id, true);
+          setRecords((prev) => prev.map((record) => record.farm.id === id ? latest : record));
+          setActionError(t("farmReviewUpdated"));
+        } catch {
+          setActionError(t("farmAdminActionError"));
+        }
+      } else {
+        setActionError(t("farmAdminActionError"));
+      }
     } finally {
       setPendingAction(false);
     }

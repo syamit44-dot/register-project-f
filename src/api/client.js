@@ -1,5 +1,5 @@
 import axios from "axios";
-import { checkAuthSession, getToken, getAuth, updateAccessToken, clearAuth } from "./auth";
+import { checkAuthSession, getToken, getAuth, updateAccessToken, clearAuth, expireAuth } from "./auth";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000/api";
 
@@ -48,8 +48,7 @@ function requestNewAccessToken() {
       .catch((err) => {
         // A failed connection does not invalidate the signed-in account.
         if (err.response?.status === 401 && !signOutPromise && getToken() && checkAuthSession()) {
-          clearAuth();
-          window.dispatchEvent(new Event("auth:expired"));
+          expireAuth();
         }
         throw err;
       })
@@ -140,8 +139,8 @@ export function getRegistration(id, isAdmin, signal) {
 }
 
 // อนุมัติหรือปฏิเสธรายการ
-export function changeRegistrationStatus(id, action) {
-  return api.post(`/admin/farm/${id}/${action}`).then((res) => res.data);
+export function changeRegistrationStatus(id, action, dateEdit) {
+  return api.post(`/admin/farm/${id}/${action}`, { date_edit: dateEdit }).then((res) => res.data);
 }
 
 // ลบรายการ
@@ -217,6 +216,7 @@ export function toFarmSummary({ farm, device, alarm, egg, silonic, userapp }, mo
     house_count: Number(farm.numbOfHouse),
     status: FARM_STATUSES[farm.status] ?? "pending",
     platform: platforms.size > 1 ? "SmartLink / TempView" : platforms.values().next().value,
+    platforms: [...platforms],
     device_model: [...new Set(device.map((item) => modelNames.get(item.modelTemp) ?? item.modelTemp))].join(", "),
     address: farm.address1,
     subdistrict: farm.address2,

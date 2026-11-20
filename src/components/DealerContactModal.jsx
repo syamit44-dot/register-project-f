@@ -1,6 +1,7 @@
 import { useState } from "react";
 import Icon from "./Icon";
 import { useLanguage } from "../i18n.jsx";
+import { isValidRegistrationPhone } from "../utils/registrationValidation";
 
 const inputClass =
   "h-11 w-full rounded-xl border border-line-strong bg-white px-3.5 text-[13.5px] text-ink shadow-sm outline-none transition placeholder:text-ink-soft/60 hover:border-brand/50 focus:border-brand focus:ring-4 focus:ring-brand-tint";
@@ -60,6 +61,10 @@ export default function DealerContactModal({ draft, onDraftChange, onSave, onClo
   const handleSave = () => {
     if (!hasAnyChannel) {
       setError(t("dealerContactRequiredError"));
+      return;
+    }
+    if (draft.dealer_contact_phone.trim() && !isValidRegistrationPhone(draft.dealer_contact_phone)) {
+      setError(t("registrationInvalidPhone", { field: t("phoneNumber") }));
       return;
     }
     onSave(draft);

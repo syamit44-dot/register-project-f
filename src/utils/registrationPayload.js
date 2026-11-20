@@ -50,7 +50,7 @@ export function appUserCounts(users) {
 }
 
 export function registrationPayload(data, t, isDealer = false, original = null) {
-  const farmError = validateFarmInformation(data, t);
+  const farmError = validateFarmInformation(data, t, original);
   if (farmError) throw new RegistrationInputError(farmError, 0);
 
   const equipment = { device: [], alarm: [], silonic: [], egg: [] };

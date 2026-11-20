@@ -360,8 +360,8 @@ export default function Step2DeviceInfo({ active, data, onChange, editor, onEdit
     return false;
   }
 
-  function closeEditor(event) {
-    if (validateSerials(event)) onEditorChange(null);
+  function closeEditor() {
+    onEditorChange(null);
   }
 
   function saveEditor(event) {
@@ -841,7 +841,7 @@ export default function Step2DeviceInfo({ active, data, onChange, editor, onEdit
               <div className="flex flex-shrink-0 justify-end gap-2 rounded-b-xl border-t border-line-strong px-7 py-5">
                 <button
                   type="button"
-                  onClick={() => onEditorChange(null)}
+                  onClick={closeEditor}
                   className="h-10 rounded-xl border border-line-strong bg-white px-4 text-[13px] font-medium text-ink transition hover:bg-mist"
                 >
                   {t("cancel")}
