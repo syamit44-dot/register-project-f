@@ -349,10 +349,11 @@ export default function Step2DeviceInfo({ active, data, onChange, editor, onEdit
     });
   }
 
-  function validateSerials(event) {
-    // The bulk editor copies settings; each house collects its own serial numbers.
-    if (isBulkEditing) return true;
-    const firstMissing = event.currentTarget.closest('[role="dialog"]').querySelector("[data-missing-serial]");
+  function validateEditor(event) {
+    const selector = isBulkEditing
+      ? "[data-missing-communication]"
+      : "[data-missing-communication], [data-missing-serial]";
+    const firstMissing = event.currentTarget.closest('[role="dialog"]').querySelector(selector);
     if (!firstMissing) return true;
     setShowSerialErrors(true);
     firstMissing.scrollIntoView({ block: "nearest" });
@@ -365,7 +366,7 @@ export default function Step2DeviceInfo({ active, data, onChange, editor, onEdit
   }
 
   function saveEditor(event) {
-    if (!draft || (isBulkEditing && !canCopy) || !validateSerials(event)) return;
+    if (!draft || (isBulkEditing && !canCopy) || !validateEditor(event)) return;
     const nextHouses = data.houses.map((house, index) => {
       if (isBulkEditing && copyTargets.includes(index)) return copyHouseSettings(draft, houses[index]);
       return index === editingIndex ? { ...draft, configured: true } : house;
@@ -442,13 +443,25 @@ export default function Step2DeviceInfo({ active, data, onChange, editor, onEdit
   function renderCommunicationPicker(section, { showSmartlinkSerial = false } = {}) {
     const communication = draft[section];
     const isOnboard = section === "silonic_communication" || section === "egg_communication";
+    const missing = !communication.smartlink && !communication.tempview;
+    const invalid = showSerialErrors && missing;
+    const labelId = `${section}-label`;
+    const errorId = `${section}-error`;
 
     return (
       <div className="mt-3">
-        <p className="text-sm font-medium text-ink">
-          {t("communication")}
+        <p id={labelId} className="text-sm font-medium text-ink">
+          {t("communication")}<span className="ml-0.5 text-alert">*</span>
         </p>
-        <div className="mt-2.5 flex flex-wrap gap-2">
+        <div
+          role="group"
+          aria-labelledby={labelId}
+          aria-invalid={invalid}
+          aria-describedby={invalid ? errorId : undefined}
+          tabIndex={-1}
+          data-missing-communication={missing ? "" : undefined}
+          className={`mt-2.5 flex flex-wrap gap-2 rounded-xl outline-none ${invalid ? "ring-2 ring-alert ring-offset-4" : ""}`}
+        >
           {COMMUNICATION_OPTIONS.map((option) => {
             const active = communication[option.key];
             const label = option.key === "smartlink" && isOnboard ? `${t(option.labelKey)} onboard` : t(option.labelKey);
@@ -485,6 +498,7 @@ export default function Step2DeviceInfo({ active, data, onChange, editor, onEdit
             );
           })}
         </div>
+        {invalid && <p id={errorId} role="alert" className="mt-2 text-xs text-alert">{t("communicationRequired")}</p>}
         {COMMUNICATION_OPTIONS.map((option) => {
           const helpId = `${section}-${option.key}-help`;
           const label = option.key === "smartlink" && isOnboard ? `${t(option.labelKey)} onboard` : t(option.labelKey);
